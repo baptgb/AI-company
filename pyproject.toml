@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aiteam"
+version = "0.1.0"
+description = "AI Team Operating System — 通用可复用的AI Agent团队管理框架"
+readme = "docs/README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "CronusL-1141" },
+]
+
+dependencies = [
+    # Core
+    "langgraph>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-core>=0.3.0",
+    # CLI
+    "typer[all]>=0.15.0",
+    "rich>=13.0.0",
+    # Config
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    # Storage (M1: SQLite built-in)
+    "aiosqlite>=0.20.0",
+    "sqlalchemy>=2.0",
+    # Async
+    "anyio>=4.0",
+]
+
+[project.optional-dependencies]
+# M2 dependencies
+full = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "websockets>=13.0",
+    "redis>=5.0",
+    "asyncpg>=0.30.0",
+    "psycopg2-binary>=2.9",
+    "mem0ai>=0.1.0",
+    "alembic>=1.14.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]
+
+[project.scripts]
+aiteam = "aiteam.cli.app:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aiteam"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
