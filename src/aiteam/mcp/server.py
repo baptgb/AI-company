@@ -1,6 +1,6 @@
 """AI Team OS — MCP Server.
 
-提供 18 个 MCP tools，通过 HTTP 调用本地 FastAPI (localhost:8000) 的对应 API 端点。
+提供 19 个 MCP tools，通过 HTTP 调用本地 FastAPI (localhost:8000) 的对应 API 端点。
 MCP Server 以 stdio 模式运行，与 FastAPI 进程完全解耦。
 """
 
@@ -90,7 +90,17 @@ def team_create(name: str, mode: str = "coordinate") -> dict[str, Any]:
     Returns:
         创建的团队信息，包含 team_id
     """
-    return _api_call("POST", "/api/teams", {"name": name, "mode": mode})
+    result = _api_call("POST", "/api/teams", {"name": name, "mode": mode})
+    result["_role_suggestions"] = {
+        "hint": "建议为团队配置以下角色以提升协作效率：",
+        "roles": [
+            {"name": "tech-lead", "count": 1, "description": "技术负责人，负责架构决策和任务拆分", "template": "tech-lead"},
+            {"name": "developer", "count": "2-3", "description": "开发工程师，负责具体实现", "template": "team-member"},
+            {"name": "qa-engineer", "count": 1, "description": "测试工程师，负责质量保障", "template": "team-member"},
+        ],
+        "tip": "使用CC的Agent tool创建子agent时，指定subagent_type为agent模板名（如tech-lead, team-member）",
+    }
+    return result
 
 
 # ============================================================
@@ -141,6 +151,10 @@ def agent_register(
 ) -> dict[str, Any]:
     """向团队注册一个新的 AI Agent。
 
+    注册成功后返回:
+    - teammates: 当前团队其他成员列表（name/role/status/current_task）
+    - team_snapshot: 所有成员状态和待办任务数
+
     Args:
         team_id: 目标团队 ID 或名称
         name: Agent 名称
@@ -149,7 +163,7 @@ def agent_register(
         system_prompt: Agent 的系统提示词
 
     Returns:
-        注册成功的 Agent 信息，包含 agent_id
+        Agent 信息 + teammates 列表 + team_snapshot
     """
     return _api_call("POST", f"/api/teams/{team_id}/agents", {
         "name": name,
@@ -298,7 +312,12 @@ def meeting_conclude(meeting_id: str) -> dict[str, Any]:
     Returns:
         更新后的会议信息
     """
-    return _api_call("PUT", f"/api/meetings/{meeting_id}/conclude")
+    result = _api_call("PUT", f"/api/meetings/{meeting_id}/conclude")
+    result["_hint"] = (
+        "会议结论已自动保存到团队记忆。"
+        "可通过 memory_search 或 team_briefing 检索历史决策。"
+    )
+    return result
 
 
 # ============================================================
@@ -315,6 +334,8 @@ def task_run(
 ) -> dict[str, Any]:
     """在团队中运行一个任务。
 
+    自动检测与已有任务的相似度，若发现相似任务会在 related_tasks 字段中返回警告。
+
     Args:
         team_id: 团队 ID 或名称
         description: 任务描述
@@ -322,7 +343,7 @@ def task_run(
         model: 指定使用的模型（可选）
 
     Returns:
-        任务执行结果
+        任务执行结果 + related_tasks（相似任务列表，如有）
     """
     payload: dict[str, Any] = {"description": description}
     if title:
@@ -425,7 +446,27 @@ def os_health_check() -> dict[str, Any]:
 
 
 # ============================================================
-# Tool 16: project_create
+# Tool 16: team_briefing
+# ============================================================
+
+
+@mcp.tool()
+def team_briefing(team_id: str) -> dict[str, Any]:
+    """获取团队全景简报 — 一次调用了解团队全部状态。
+
+    返回团队信息、成员状态、最近事件、最近会议、待办任务和操作建议。
+
+    Args:
+        team_id: 团队 ID 或团队名称
+
+    Returns:
+        团队全景简报，包含 agents / recent_events / recent_meeting / pending_tasks / _hints
+    """
+    return _api_call("GET", f"/api/teams/{team_id}/briefing")
+
+
+# ============================================================
+# Tool 17: project_create
 # ============================================================
 
 
@@ -453,7 +494,7 @@ def project_create(
 
 
 # ============================================================
-# Tool 17: phase_create
+# Tool 18: phase_create
 # ============================================================
 
 
@@ -483,7 +524,7 @@ def phase_create(
 
 
 # ============================================================
-# Tool 18: phase_list
+# Tool 19: phase_list
 # ============================================================
 
 
@@ -498,6 +539,90 @@ def phase_list(project_id: str) -> dict[str, Any]:
         Phase 列表，包含每个 Phase 的名称、状态和排序
     """
     return _api_call("GET", f"/api/projects/{project_id}/phases")
+
+
+# ============================================================
+# Tool 20: team_setup_guide
+# ============================================================
+
+_PROJECT_TYPE_ROLES: dict[str, dict[str, Any]] = {
+    "web-app": {
+        "description": "全栈Web应用项目",
+        "roles": [
+            {"name": "tech-lead", "count": 1, "description": "架构设计、技术决策、代码审查", "template": "tech-lead"},
+            {"name": "backend-engineer", "count": "1-2", "description": "API开发、数据库设计、业务逻辑", "template": "team-member"},
+            {"name": "frontend-engineer", "count": "1-2", "description": "UI组件、页面交互、响应式布局", "template": "team-member"},
+            {"name": "qa-engineer", "count": 1, "description": "端到端测试、跨浏览器兼容性", "template": "team-member"},
+        ],
+    },
+    "api-service": {
+        "description": "后端API服务项目",
+        "roles": [
+            {"name": "tech-lead", "count": 1, "description": "API架构、接口规范、性能优化", "template": "tech-lead"},
+            {"name": "backend-engineer", "count": "2-3", "description": "端点开发、中间件、数据持久化", "template": "team-member"},
+            {"name": "qa-engineer", "count": 1, "description": "API测试、负载测试、契约测试", "template": "team-member"},
+        ],
+    },
+    "data-pipeline": {
+        "description": "数据处理管道项目",
+        "roles": [
+            {"name": "tech-lead", "count": 1, "description": "管道架构、数据流设计", "template": "tech-lead"},
+            {"name": "data-engineer", "count": "2-3", "description": "ETL开发、数据清洗、调度配置", "template": "team-member"},
+            {"name": "qa-engineer", "count": 1, "description": "数据质量验证、回归测试", "template": "team-member"},
+        ],
+    },
+    "library": {
+        "description": "可复用库/SDK项目",
+        "roles": [
+            {"name": "tech-lead", "count": 1, "description": "API设计、版本策略、兼容性", "template": "tech-lead"},
+            {"name": "developer", "count": "1-2", "description": "核心实现、文档编写", "template": "team-member"},
+            {"name": "qa-engineer", "count": 1, "description": "单元测试、集成测试、示例验证", "template": "team-member"},
+        ],
+    },
+    "refactor": {
+        "description": "代码重构项目",
+        "roles": [
+            {"name": "tech-lead", "count": 1, "description": "重构策略、影响分析、渐进式迁移", "template": "tech-lead"},
+            {"name": "developer", "count": "1-2", "description": "代码迁移、依赖更新", "template": "team-member"},
+            {"name": "qa-engineer", "count": 1, "description": "回归测试、行为一致性验证", "template": "team-member"},
+        ],
+    },
+    "bugfix": {
+        "description": "Bug修复项目",
+        "roles": [
+            {"name": "developer", "count": "1-2", "description": "问题定位、修复实现", "template": "team-member"},
+            {"name": "qa-engineer", "count": 1, "description": "复现验证、回归测试", "template": "team-member"},
+        ],
+    },
+}
+
+
+@mcp.tool()
+def team_setup_guide(project_type: str = "web-app") -> dict[str, Any]:
+    """根据项目类型获取推荐的团队角色配置。
+
+    Args:
+        project_type: 项目类型，可选值：web-app, api-service, data-pipeline, library, refactor, bugfix
+
+    Returns:
+        推荐角色列表和组建提示
+    """
+    config = _PROJECT_TYPE_ROLES.get(project_type)
+    if config is None:
+        return {
+            "success": False,
+            "error": f"未知项目类型: {project_type}",
+            "available_types": list(_PROJECT_TYPE_ROLES.keys()),
+        }
+    return {
+        "success": True,
+        "data": {
+            "project_type": project_type,
+            "description": config["description"],
+            "recommended_roles": config["roles"],
+            "tip": "使用CC的Agent tool创建子agent时，指定subagent_type为agent模板名（如tech-lead, team-member）",
+        },
+    }
 
 
 # ============================================================

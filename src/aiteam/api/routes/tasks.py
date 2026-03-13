@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
-from aiteam.api.deps import get_manager
+from aiteam.api.deps import get_manager, get_repository
 from aiteam.api.schemas import APIListResponse, APIResponse, TaskRun
 from aiteam.orchestrator.team_manager import TeamManager
-from aiteam.types import Task, TaskResult
+from aiteam.storage.repository import StorageRepository
+from aiteam.types import Task, TaskResult, TaskStatus
 
 router = APIRouter(tags=["tasks"])
 
@@ -25,17 +28,46 @@ async def list_tasks(
     return APIListResponse(data=tasks, total=len(tasks))
 
 
+def _keyword_overlap(a: str, b: str) -> int:
+    """计算两个文本的关键词重叠数."""
+    words_a = set(a.lower().split())
+    words_b = set(b.lower().split())
+    return len(words_a & words_b)
+
+
 @router.post(
     "/api/teams/{team_id}/tasks/run",
-    response_model=APIResponse[TaskResult],
 )
 async def run_task(
     team_id: str,
     body: TaskRun,
     manager: TeamManager = Depends(get_manager),
-) -> APIResponse[TaskResult]:
-    """运行任务."""
-    kwargs = {}
+    repo: StorageRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    """运行任务，返回结果和相关任务（重复检测）."""
+    # 获取团队信息以查询正在运行的任务
+    team = await manager.get_team(team_id)
+    running_tasks = await repo.list_tasks(team.id, status=TaskStatus.RUNNING)
+
+    # 检测与正在运行任务的标题关键词重叠（重叠词数>=2视为相似）
+    related_tasks: list[dict[str, Any]] = []
+    new_title = body.title or body.description[:50]
+    for t in running_tasks:
+        overlap = _keyword_overlap(new_title, t.title)
+        if overlap >= 2:
+            related_tasks.append({
+                "id": t.id,
+                "title": t.title,
+                "status": t.status.value if hasattr(t.status, "value") else str(t.status),
+                "overlap_words": overlap,
+            })
+
+    # 按重叠数排序，最多返回5条
+    related_tasks.sort(key=lambda x: x["overlap_words"], reverse=True)
+    related_tasks = related_tasks[:5]
+
+    # 执行任务
+    kwargs: dict[str, Any] = {}
     if body.title:
         kwargs["title"] = body.title
     if body.model:
@@ -45,7 +77,16 @@ async def run_task(
         task_description=body.description,
         **kwargs,
     )
-    return APIResponse(data=result, message="任务执行完成")
+
+    resp: dict[str, Any] = {
+        "success": True,
+        "data": result.model_dump(mode="json"),
+        "message": "任务执行完成",
+    }
+    if related_tasks:
+        resp["related_tasks"] = related_tasks
+        resp["_warning"] = f"检测到{len(related_tasks)}个相似的运行中任务，请确认是否重复"
+    return resp
 
 
 @router.get(

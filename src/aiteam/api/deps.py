@@ -65,39 +65,56 @@ async def _run_migrations(db_url: str | None = None) -> None:
 async def _auto_create_projects(repo: StorageRepository) -> None:
     """为没有 project_id 的 Team 自动创建对应 Project 并关联."""
     teams = await repo.list_teams()
-    created = 0
-    for team in teams:
-        if team.project_id is None or team.project_id == "":
-            project = await repo.create_project(
-                name=f"Project-{team.name}",
-                description=f"Auto-created project for team: {team.name}",
-            )
+    orphan_teams = [t for t in teams if not t.project_id]
+    if not orphan_teams:
+        return
+    # 检查是否已有项目可以复用
+    existing_projects = await repo.list_projects()
+    if existing_projects:
+        # 所有孤立Team归入第一个现有Project
+        project = existing_projects[0]
+        for team in orphan_teams:
             await repo.update_team(team.id, project_id=project.id)
-            created += 1
-    if created > 0:
-        logger.info("自动创建 %d 个 Project 并关联到已有 Team", created)
+        logger.info("将 %d 个孤立Team关联到已有Project: %s", len(orphan_teams), project.name)
+    else:
+        # 创建一个统一Project，用team_id做唯一root_path
+        project = await repo.create_project(
+            name="AI Team OS",
+            root_path=f"auto-{orphan_teams[0].id}",
+            description="Auto-created project",
+        )
+        for team in orphan_teams:
+            await repo.update_team(team.id, project_id=project.id)
+        logger.info("自动创建Project并关联 %d 个Team", len(orphan_teams))
 
 
 async def _startup_reconciliation(repo: StorageRepository) -> None:
-    """启动对账 — OS重启时将所有BUSY agent设为IDLE.
+    """启动对账 — OS重启时将所有BUSY agent设为IDLE并清除session关联.
 
     原理：OS重启意味着之前的CC session已不存在，
-    所有残留的BUSY状态都是僵尸，需要清零。
+    所有残留的BUSY状态和session_id都是僵尸，需要清零。
     """
     teams = await repo.list_teams()
     reconciled = 0
     for team in teams:
         agents = await repo.list_agents(team.id)
         for agent in agents:
+            needs_update = False
+            updates: dict = {}
             if agent.status == AgentStatus.BUSY:
-                await repo.update_agent(
-                    agent.id, status=AgentStatus.IDLE.value, current_task=None,
-                )
+                updates["status"] = AgentStatus.IDLE.value
+                updates["current_task"] = None
+                needs_update = True
+            if agent.session_id:
+                updates["session_id"] = None
+                needs_update = True
+            if needs_update:
+                await repo.update_agent(agent.id, **updates)
                 reconciled += 1
     if reconciled > 0:
-        logger.warning("启动对账: %d 个BUSY agent已重置为IDLE", reconciled)
+        logger.warning("启动对账: %d 个agent已重置（状态+session清零）", reconciled)
     else:
-        logger.info("启动对账: 无残留BUSY agent")
+        logger.info("启动对账: 无需重置")
 
 
 async def init_dependencies() -> None:
@@ -157,6 +174,14 @@ def get_repository() -> StorageRepository:
         msg = "StorageRepository 尚未初始化"
         raise RuntimeError(msg)
     return _repository
+
+
+def get_memory_store() -> MemoryStore:
+    """获取 MemoryStore 实例，通过 FastAPI Depends() 注入."""
+    if _memory_store is None:
+        msg = "MemoryStore 尚未初始化，请确保应用已启动"
+        raise RuntimeError(msg)
+    return _memory_store
 
 
 def get_event_bus() -> EventBus:

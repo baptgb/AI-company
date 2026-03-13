@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
 from aiteam.api.deps import get_event_bus, get_manager, get_repository
@@ -9,7 +11,7 @@ from aiteam.api.event_bus import EventBus
 from aiteam.api.schemas import AgentCreate, AgentStatusUpdate, APIListResponse, APIResponse
 from aiteam.orchestrator.team_manager import TeamManager
 from aiteam.storage.repository import StorageRepository
-from aiteam.types import Agent, AgentStatus
+from aiteam.types import Agent, AgentStatus, TaskStatus
 
 router = APIRouter(tags=["agents"])
 
@@ -29,15 +31,15 @@ async def list_agents(
 
 @router.post(
     "/api/teams/{team_id}/agents",
-    response_model=APIResponse[Agent],
     status_code=201,
 )
 async def add_agent(
     team_id: str,
     body: AgentCreate,
     manager: TeamManager = Depends(get_manager),
-) -> APIResponse[Agent]:
-    """向团队添加Agent."""
+    repo: StorageRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    """向团队添加Agent，返回agent信息和团队快照."""
     agent = await manager.add_agent(
         team_name=team_id,
         name=body.name,
@@ -45,7 +47,44 @@ async def add_agent(
         system_prompt=body.system_prompt,
         model=body.model,
     )
-    return APIResponse(data=agent, message="Agent添加成功")
+
+    # 获取团队快照：当前所有agent和待办任务数
+    team = await manager.get_team(team_id)
+    all_agents = await repo.list_agents(team.id)
+    all_tasks = await repo.list_tasks(team.id)
+    pending_count = sum(
+        1 for t in all_tasks
+        if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
+    )
+
+    # 构建teammates列表（排除刚注册的自己）
+    teammates = [
+        {
+            "name": a.name,
+            "role": a.role,
+            "status": a.status.value if hasattr(a.status, "value") else str(a.status),
+            "current_task": a.current_task,
+        }
+        for a in all_agents
+        if a.id != agent.id
+    ]
+
+    return {
+        "success": True,
+        "data": agent.model_dump(mode="json"),
+        "message": "Agent添加成功",
+        "teammates": teammates,
+        "team_snapshot": {
+            "agents": [
+                {
+                    "name": a.name,
+                    "status": a.status.value if hasattr(a.status, "value") else str(a.status),
+                }
+                for a in all_agents
+            ],
+            "pending_tasks_count": pending_count,
+        },
+    }
 
 
 @router.delete(

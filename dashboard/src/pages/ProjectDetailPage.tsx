@@ -345,7 +345,7 @@ function PhaseContent({ teamId }: { teamId: string }) {
             <DialogHeader>
               <DialogTitle>添加 Agent</DialogTitle>
               <DialogDescription>
-                为阶段「{team?.name ?? ''}」添加一个新的 Agent
+                为任务「{team?.name ?? ''}」添加一个新的 Agent
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -406,7 +406,7 @@ function PhaseContent({ teamId }: { teamId: string }) {
           <form onSubmit={handleRunTask}>
             <DialogHeader>
               <DialogTitle>执行新任务</DialogTitle>
-              <DialogDescription>为阶段「{team?.name ?? ''}」创建并执行一个新任务</DialogDescription>
+              <DialogDescription>为任务「{team?.name ?? ''}」创建并执行一个新工作项</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -433,7 +433,7 @@ function PhaseContent({ teamId }: { teamId: string }) {
           <form onSubmit={handleCreateMeeting}>
             <DialogHeader>
               <DialogTitle>发起会议</DialogTitle>
-              <DialogDescription>为阶段「{team?.name ?? ''}」发起一场 Agent 会议</DialogDescription>
+              <DialogDescription>为任务「{team?.name ?? ''}」发起一场 Agent 会议</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -461,27 +461,39 @@ export function ProjectDetailPage() {
   const { data: projectData, isLoading: projectLoading, error: projectError } = useProject(projectId ?? '');
   const { data: phasesData, isLoading: phasesLoading } = useProjectPhases(projectId ?? '');
 
-  // Also load legacy teams for fallback (project may still use teams as phases)
+  // Load all teams — project's teams are used as "任务" when no phases exist
   const { data: teamsData } = useTeams();
 
   const project = projectData?.data;
   const phases = phasesData?.data ?? [];
-
-  // Find teams associated with this project's phases
   const allTeams = teamsData?.data ?? [];
 
-  const [selectedPhaseIdx, setSelectedPhaseIdx] = useState(0);
+  // 项目关联的teams（按project_id匹配，或无project_id则全部归入）
+  const projectTeams = allTeams.filter(
+    (t) => t.project_id === projectId || (!t.project_id && allTeams.length > 0),
+  );
 
-  // Determine the teamId for the currently selected phase
-  // Phase.id maps to a team — the backend creates phases from teams
-  const selectedPhase = phases[selectedPhaseIdx];
-  // For now, phases map 1:1 with teams via team's project_id
-  // Use phase config.team_id if available, otherwise try matching by name
-  const selectedTeamId = selectedPhase
-    ? (selectedPhase.config?.team_id as string) ??
-      allTeams.find((t) => t.name === selectedPhase.name)?.id ??
-      ''
-    : allTeams[0]?.id ?? '';
+  // 当有Phase记录时使用Phase，否则直接用teams作为"任务"
+  const hasPhases = phases.length > 0;
+
+  // 任务列表：优先用phases，fallback到teams
+  const taskItems = hasPhases
+    ? phases.map((p) => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        teamId: (p.config?.team_id as string) ?? allTeams.find((t) => t.name === p.name)?.id ?? '',
+      }))
+    : projectTeams.map((t) => ({
+        id: t.id,
+        name: t.name,
+        status: t.status ?? 'active',
+        teamId: t.id,
+      }));
+
+  const [selectedTaskIdx, setSelectedTaskIdx] = useState(0);
+  const selectedTask = taskItems[selectedTaskIdx];
+  const selectedTeamId = selectedTask?.teamId ?? '';
 
   if (projectLoading) {
     return (
@@ -515,8 +527,9 @@ export function ProjectDetailPage() {
     );
   }
 
-  const useTabLayout = phases.length > 0 && phases.length <= 3;
-  const useSidebarLayout = phases.length > 3;
+  const useTabLayout = taskItems.length > 0 && taskItems.length <= 3;
+  const useSidebarLayout = taskItems.length > 3;
+  const dataLoading = phasesLoading;
 
   return (
     <div className="space-y-6">
@@ -545,9 +558,9 @@ export function ProjectDetailPage() {
               <p className="mt-1">{project.description || '--'}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">阶段数</p>
+              <p className="text-muted-foreground">任务数</p>
               <p className="mt-1">
-                {phasesLoading ? <Skeleton className="h-4 w-8 inline-block" /> : phases.length}
+                {dataLoading ? <Skeleton className="h-4 w-8 inline-block" /> : taskItems.length}
               </p>
             </div>
             <div>
@@ -558,78 +571,70 @@ export function ProjectDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Phase Navigation + Content */}
-      {phasesLoading ? (
+      {/* 任务 Navigation + Content */}
+      {dataLoading ? (
         <div className="space-y-3">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-40 w-full" />
         </div>
-      ) : phases.length === 0 ? (
+      ) : taskItems.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Layers className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
             <p className="text-sm text-muted-foreground">
-              暂无阶段，请通过 API 或 MCP 创建项目阶段
+              暂无任务，请通过 API 或 MCP 创建项目任务
             </p>
           </CardContent>
         </Card>
       ) : useTabLayout ? (
-        /* Tab layout for <= 3 phases */
-        <Tabs defaultValue={phases[0]?.id}>
+        /* Tab layout for <= 3 tasks */
+        <Tabs defaultValue={taskItems[0]?.id}>
           <TabsList>
-            {phases.map((phase) => (
-              <TabsTrigger key={phase.id} value={phase.id}>
-                {phase.name}
-                <PhaseStatusBadge status={phase.status} />
+            {taskItems.map((task) => (
+              <TabsTrigger key={task.id} value={task.id}>
+                {task.name}
+                <PhaseStatusBadge status={task.status as Phase['status']} />
               </TabsTrigger>
             ))}
           </TabsList>
-          {phases.map((phase, idx) => {
-            const phaseTeamId =
-              (phase.config?.team_id as string) ??
-              allTeams.find((t) => t.name === phase.name)?.id ??
-              '';
-            return (
-              <TabsContent key={phase.id} value={phase.id}>
-                {phaseTeamId ? (
-                  <PhaseContent teamId={phaseTeamId} />
-                ) : (
-                  <Card>
-                    <CardContent className="py-8 text-center">
-                      <p className="text-sm text-muted-foreground">
-                        阶段「{phase.name}」尚未关联团队数据
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            );
-          })}
+          {taskItems.map((task) => (
+            <TabsContent key={task.id} value={task.id}>
+              {task.teamId ? (
+                <PhaseContent teamId={task.teamId} />
+              ) : (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      任务「{task.name}」尚未关联团队数据
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          ))}
         </Tabs>
       ) : (
-        /* Sidebar layout for > 3 phases */
+        /* Sidebar layout for > 3 tasks */
         <div className="flex gap-4">
-          {/* Phase sidebar */}
           <div className="w-56 shrink-0 space-y-1">
-            {phases.map((phase, idx) => (
+            {taskItems.map((task, idx) => (
               <button
-                key={phase.id}
-                onClick={() => setSelectedPhaseIdx(idx)}
+                key={task.id}
+                onClick={() => setSelectedTaskIdx(idx)}
                 className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                  selectedPhaseIdx === idx
+                  selectedTaskIdx === idx
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-muted'
                 }`}
               >
-                <div className="font-medium">{phase.name}</div>
+                <div className="font-medium">{task.name}</div>
                 <div className="mt-0.5">
-                  <PhaseStatusBadge status={phase.status} />
+                  <PhaseStatusBadge status={task.status as Phase['status']} />
                 </div>
               </button>
             ))}
           </div>
 
-          {/* Phase content */}
           <div className="flex-1 min-w-0">
             {selectedTeamId ? (
               <PhaseContent teamId={selectedTeamId} />
@@ -637,7 +642,7 @@ export function ProjectDetailPage() {
               <Card>
                 <CardContent className="py-8 text-center">
                   <p className="text-sm text-muted-foreground">
-                    阶段「{selectedPhase?.name}」尚未关联团队数据
+                    任务「{selectedTask?.name}」尚未关联团队数据
                   </p>
                 </CardContent>
               </Card>

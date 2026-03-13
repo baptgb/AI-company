@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 class HookTranslator:
     """将Claude Code hook事件转化为OS系统操作."""
 
+    # 文件编辑工具名称集合，用于冲突检测
+    _FILE_EDIT_TOOLS = frozenset({"Edit", "Write"})
+
     def __init__(self, repo: StorageRepository, event_bus: EventBus) -> None:
         self.repo = repo
         self.event_bus = event_bus
@@ -149,41 +152,31 @@ class HookTranslator:
         return {"status": "updated", "agents_idle": updated}
 
     async def _find_leader(self, session_id: str) -> object | None:
-        """统一查找主session的Tech Lead agent.
+        """查找当前session的leader agent.
 
-        三级策略：
-        1. 按session_id精确匹配（最可靠）
-        2. 按团队中api-source agent匹配（fallback）
-        3. 任何状态都匹配（BUSY优先，IDLE也匹配 — 支持自愈）
+        严格按session_id匹配，避免错误关联到其他session的agent。
         """
-        # 策略1: session_id精确匹配
-        if session_id:
-            agents = await self.repo.find_agents_by_session(session_id)
-            api_matches = [a for a in agents if a.source == "api"]
-            if api_matches:
-                return api_matches[0]
-
-        # 策略2: 团队中的api-source agent（不限状态）
-        teams = await self.repo.list_teams()
-        if not teams:
+        if not session_id:
             return None
 
-        all_agents = await self.repo.list_agents(teams[0].id)
-        api_agents = [a for a in all_agents if a.source == "api"]
-        if not api_agents:
+        # 按session_id精确匹配
+        agents = await self.repo.find_agents_by_session(session_id)
+        if not agents:
             return None
 
-        # BUSY优先
-        busy = [a for a in api_agents if a.status == "busy"]
-        if busy:
-            return busy[0]
+        # 优先返回leader角色的agent
+        leaders = [a for a in agents if a.role == "leader"]
+        if leaders:
+            return leaders[0]
 
-        # 无BUSY → 返回最近活跃的（支持重启后自愈）
-        api_agents.sort(
-            key=lambda a: a.last_active_at or a.created_at,
-            reverse=True,
-        )
-        return api_agents[0]
+        # 其次返回api-source的agent
+        api_matches = [a for a in agents if a.source == "api"]
+        if api_matches:
+            return api_matches[0]
+
+        # 最后返回任何匹配的agent（BUSY优先）
+        agents.sort(key=lambda a: (0 if a.status == "busy" else 1))
+        return agents[0]
 
     async def _self_heal_agent(self, agent, trigger: str = "self_heal") -> None:
         """自愈：IDLE agent收到工具事件 → 修正为BUSY."""
@@ -202,6 +195,59 @@ class HookTranslator:
             },
         )
         logger.info("自愈: %s IDLE→BUSY (trigger=%s)", agent.name, trigger)
+
+    async def _check_file_edit_conflict(
+        self, tool_name: str, tool_input: dict | str,
+        target_agent_id: str, target_agent_name: str, session_id: str,
+    ) -> None:
+        """检测文件编辑冲突 — 查询同session其他BUSY agent的近5分钟activity."""
+        if tool_name not in self._FILE_EDIT_TOOLS:
+            return
+
+        file_path = ""
+        if isinstance(tool_input, dict):
+            file_path = tool_input.get("file_path", "") or tool_input.get("path", "")
+        if not file_path:
+            return
+
+        # 查找同session的其他BUSY agent
+        session_agents = await self.repo.find_agents_by_session(session_id)
+        other_busy = [
+            a for a in session_agents
+            if a.id != target_agent_id and a.status == "busy"
+        ]
+        if not other_busy:
+            return
+
+        cutoff = datetime.now() - timedelta(minutes=5)
+        for other in other_busy:
+            # 查询该agent最近的activity记录
+            activities = await self.repo.list_activities(other.id, limit=20)
+            for act in activities:
+                # 只看5分钟内的Edit/Write活动
+                if act.timestamp and act.timestamp < cutoff:
+                    break
+                if act.tool_name not in self._FILE_EDIT_TOOLS:
+                    continue
+                # 检查是否编辑了同一文件
+                if file_path in (act.input_summary or ""):
+                    await self.event_bus.emit(
+                        "file.edit_conflict",
+                        f"file:{file_path}",
+                        {
+                            "file_path": file_path,
+                            "previous_agent_name": other.name,
+                            "previous_agent_id": other.id,
+                            "current_agent_name": target_agent_name,
+                            "current_agent_id": target_agent_id,
+                            "session_id": session_id,
+                        },
+                    )
+                    logger.warning(
+                        "文件编辑冲突: %s — %s (先) vs %s (后)",
+                        file_path, other.name, target_agent_name,
+                    )
+                    return  # 找到一个冲突即可，不需要重复记录
 
     async def _on_pre_tool_use(self, payload: dict) -> dict:
         """记录工具使用事件.
@@ -261,6 +307,12 @@ class HookTranslator:
             except Exception:
                 pass  # current_task列可能尚未生效
 
+            # 文件编辑冲突检测（仅记录事件，不阻止操作）
+            await self._check_file_edit_conflict(
+                tool_name, tool_input,
+                target_agent.id, target_agent.name, session_id,
+            )
+
         await self.event_bus.emit(
             "cc.tool_use",
             f"session:{session_id}",
@@ -272,6 +324,62 @@ class HookTranslator:
             },
         )
         return {"decision": "allow"}
+
+    async def _check_file_edit_conflict(
+        self, tool_name: str, tool_input: dict | str, agent_name: str, agent_id: str,
+    ) -> dict | None:
+        """检测文件编辑冲突 — 同一文件被不同agent编辑时发出警告."""
+        if tool_name not in self._FILE_EDIT_TOOLS:
+            return None
+
+        file_path = ""
+        if isinstance(tool_input, dict):
+            file_path = tool_input.get("file_path", "") or tool_input.get("path", "")
+        if not file_path:
+            return None
+
+        now = datetime.now()
+        # 清理5分钟前的过期记录
+        stale_cutoff = now - timedelta(minutes=5)
+        stale_keys = [
+            k for k, v in self._file_edit_tracker.items()
+            if v[2] < stale_cutoff
+        ]
+        for k in stale_keys:
+            del self._file_edit_tracker[k]
+
+        # 检查是否有其他agent编辑过同一文件
+        conflict = None
+        if file_path in self._file_edit_tracker:
+            prev_name, prev_id, prev_time = self._file_edit_tracker[file_path]
+            if prev_id != agent_id:
+                conflict = {
+                    "file": file_path,
+                    "previous_agent": prev_name,
+                    "current_agent": agent_name,
+                    "previous_time": prev_time.isoformat(),
+                    "current_time": now.isoformat(),
+                }
+                await self.event_bus.emit(
+                    "file.edit_conflict",
+                    f"file:{file_path}",
+                    {
+                        "file_path": file_path,
+                        "previous_agent_name": prev_name,
+                        "previous_agent_id": prev_id,
+                        "current_agent_name": agent_name,
+                        "current_agent_id": agent_id,
+                        "gap_seconds": (now - prev_time).total_seconds(),
+                    },
+                )
+                logger.warning(
+                    "文件编辑冲突: %s — %s (先) vs %s (后)",
+                    file_path, prev_name, agent_name,
+                )
+
+        # 更新追踪记录
+        self._file_edit_tracker[file_path] = (agent_name, agent_id, now)
+        return conflict
 
     async def _on_post_tool_use(self, payload: dict) -> dict:
         """记录工具完成事件，包含输出摘要.
@@ -349,27 +457,37 @@ class HookTranslator:
     async def _on_session_start(self, payload: dict) -> dict:
         """记录CC会话启动.
 
-        同时更新Tech Lead的session_id，确保compact后追踪不丢失。
-        compact不会触发SessionEnd/SessionStart，但新对话会。
+        自动为session注册leader agent，确保后续工具事件能正确关联。
         """
         session_id = payload.get("session_id", "")
         cwd = payload.get("cwd", "")
 
-        # 更新api注册的BUSY agent的session_id（Tech Lead）
-        # 只更新最近创建的团队（避免多team场景下错误更新其他团队的agent）
-        teams = await self.repo.list_teams()
-        updated_leaders: list[str] = []
-        if teams:
-            # list_teams按created_at DESC排序，取第一个（最近创建的团队）
-            target_team = teams[0]
-            agents = await self.repo.list_agents(target_team.id)
-            for agent in agents:
-                if agent.source == "api" and agent.status == "busy":
-                    await self.repo.update_agent(
-                        agent.id, session_id=session_id,
-                        last_active_at=datetime.now(),
-                    )
-                    updated_leaders.append(agent.name)
+        # 查找是否已有此session的agent
+        existing = await self.repo.find_agents_by_session(session_id)
+        leader = None
+
+        if not existing:
+            # 新session → 在最近的团队中注册一个leader agent
+            team = await self._find_or_create_session_team(session_id, payload)
+            if team:
+                leader = await self.repo.create_agent(
+                    team_id=team.id,
+                    name=f"session-{session_id[:8]}",
+                    role="leader",
+                    backstory=f"Auto-registered leader for session {session_id[:8]}",
+                    source="hook",
+                    session_id=session_id,
+                )
+                await self.repo.update_agent(
+                    leader.id, status="busy", last_active_at=datetime.now(),
+                )
+                logger.info("SessionStart: 自动注册leader %s → team %s", leader.name, team.name)
+        else:
+            # 已有agent → 更新session关联和状态
+            leader = existing[0]
+            await self.repo.update_agent(
+                leader.id, status="busy", last_active_at=datetime.now(),
+            )
 
         await self.event_bus.emit(
             "cc.session_start",
@@ -377,10 +495,10 @@ class HookTranslator:
             {
                 "session_id": session_id,
                 "cwd": cwd,
-                "updated_leaders": updated_leaders,
+                "leader": leader.name if leader else None,
             },
         )
-        return {"status": "recorded", "updated_leaders": updated_leaders}
+        return {"status": "recorded", "leader": leader.name if leader else None}
 
     async def _on_session_end(self, payload: dict) -> dict:
         """处理CC会话结束 — 对账并清理状态."""
@@ -478,9 +596,28 @@ class HookTranslator:
     ):
         """查找与session关联的团队.
 
-        简单策略：返回最近创建的团队。
+        策略：
+        1. 查找leader所在的团队（session_id匹配）
+        2. 返回最近创建的团队（fallback）
+        3. 自动创建新团队（无团队时）
         """
+        # 策略1: 找到leader所在的团队
+        if session_id:
+            agents = await self.repo.find_agents_by_session(session_id)
+            if agents:
+                # leader的团队就是目标团队
+                return await self.repo.get_team(agents[0].team_id)
+
+        # 策略2: 返回最近创建的团队
         teams = await self.repo.list_teams()
         if teams:
-            return teams[0]  # list_teams按created_at DESC排序
-        return None
+            return teams[0]
+
+        # 策略3: 创建新团队
+        cwd = payload.get("cwd", "")
+        team = await self.repo.create_team(
+            name=f"session-{session_id[:8]}",
+            mode="coordinate",
+        )
+        logger.info("自动创建团队: %s (session=%s, cwd=%s)", team.name, session_id[:8], cwd)
+        return team

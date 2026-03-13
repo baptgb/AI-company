@@ -93,9 +93,7 @@ class StateReaper:
                     if reaped:
                         reaped_count += 1
 
-                elif agent.status == AgentStatus.IDLE and agent.source == "api":
-                    # IDLE的api-source agent: 双向修正（团队文件在但agent IDLE）
-                    await self._try_recover_from_team_files(agent)
+                # 不再做反向恢复（IDLE→BUSY），状态恢复由hooks驱动
 
         # 检查会议过期
         await self._check_meeting_expiry(now)
@@ -143,19 +141,11 @@ class StateReaper:
         return True
 
     async def _check_leader_via_team_files(self, agent, now: datetime) -> bool:
-        """CC团队文件探测 — 检查~/.claude/teams/目录判断Leader活跃度.
+        """检查api-source BUSY agent是否超时.
 
         仅对BUSY的api-source agent调用。
-        - 有活跃团队文件 → 活跃，不收割
-        - 无团队文件 → 检查last_active_at超时，超时则设IDLE
+        基于last_active_at判断，不再依赖团队文件探测。
         """
-        has_team_files = self._detect_team_files()
-
-        if has_team_files:
-            # 有文件 = 活跃，不需要收割
-            return False
-
-        # 无团队文件 → 检查last_active_at
         if agent.last_active_at is None:
             reference_time = agent.created_at
         else:
@@ -167,9 +157,9 @@ class StateReaper:
         if elapsed <= API_SOURCE_TIMEOUT_NO_FILE:
             return False
 
-        # 超时且无团队文件 → 设为IDLE
+        # 超时 → 设为IDLE
         logger.warning(
-            "api-agent超时: %s (无团队文件), 已%.0f秒无活动，设为IDLE",
+            "api-agent超时: %s, 已%.0f秒无活动，设为IDLE",
             agent.name, elapsed,
         )
         await self._repo.update_agent(
@@ -183,76 +173,11 @@ class StateReaper:
                 "name": agent.name,
                 "old_status": "busy",
                 "status": "idle",
-                "trigger": "team_file_check",
+                "trigger": "timeout_reaper",
                 "elapsed_seconds": round(elapsed),
             },
         )
         return True
-
-    async def _try_recover_from_team_files(self, agent) -> None:
-        """双向修正 — 如果团队文件存在但agent是IDLE，修正为BUSY.
-
-        仅对IDLE的api-source agent调用。
-        """
-        if not self._detect_team_files():
-            return
-
-        logger.warning(
-            "团队文件修正: %s 应为BUSY（检测到活跃团队文件），修正状态",
-            agent.name,
-        )
-        await self._repo.update_agent(
-            agent.id, status=AgentStatus.BUSY.value,
-        )
-        await self._event_bus.emit(
-            "agent.status_changed",
-            f"agent:{agent.id}",
-            {
-                "agent_id": agent.id,
-                "name": agent.name,
-                "old_status": "idle",
-                "status": "busy",
-                "trigger": "team_file_recovery",
-            },
-        )
-
-    def _detect_team_files(self) -> bool:
-        """检查~/.claude/teams/目录下是否有与当前项目相关的活跃团队.
-
-        读取config.json验证CWD匹配当前项目，排除其他项目的旧团队文件。
-        """
-        import json
-        import os
-
-        claude_home = Path(CLAUDE_HOME).expanduser()
-        teams_dir = claude_home / "teams"
-
-        if not teams_dir.exists():
-            return False
-
-        # 当前项目目录（用于匹配）
-        current_cwd = os.getcwd().replace("\\", "/").lower()
-
-        try:
-            for entry in teams_dir.iterdir():
-                if not entry.is_dir():
-                    continue
-                config_file = entry / "config.json"
-                if not config_file.exists():
-                    continue
-                try:
-                    config = json.loads(config_file.read_text(encoding="utf-8"))
-                    # 检查members中是否有CWD匹配当前项目的成员
-                    for member in config.get("members", []):
-                        member_cwd = member.get("cwd", "").replace("\\", "/").lower()
-                        if member_cwd and member_cwd == current_cwd:
-                            return True
-                except (json.JSONDecodeError, OSError):
-                    continue
-        except OSError:
-            logger.debug("读取teams目录失败: %s", teams_dir)
-
-        return False
 
     async def _check_meeting_expiry(self, now: datetime) -> None:
         """检查并自动结束超期会议.

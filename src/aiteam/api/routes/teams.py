@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
-from aiteam.api.deps import get_manager
+from aiteam.api.deps import get_manager, get_repository
 from aiteam.api.schemas import (
     APIListResponse,
     APIResponse,
@@ -12,7 +14,8 @@ from aiteam.api.schemas import (
     TeamUpdate,
 )
 from aiteam.orchestrator.team_manager import TeamManager
-from aiteam.types import Team, TeamStatus
+from aiteam.storage.repository import StorageRepository
+from aiteam.types import AgentStatus, TaskStatus, Team, TeamStatus
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
@@ -80,3 +83,103 @@ async def get_status(
     """获取团队状态摘要."""
     status = await manager.get_status(team_id)
     return APIResponse(data=status)
+
+
+@router.get("/{team_id}/briefing")
+async def team_briefing(
+    team_id: str,
+    manager: TeamManager = Depends(get_manager),
+    repo: StorageRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    """获取团队全景简报 — 一次调用了解团队全部状态。
+
+    聚合团队信息、成员状态、最近事件、最近会议、未完成任务和操作建议。
+    """
+    # 1. 团队基本信息（支持name或id查找）
+    team = await manager.get_team(team_id)
+
+    # 2. Agent列表（含状态和current_task）
+    agents = await repo.list_agents(team.id)
+
+    # 3. 最近10个事件（全局事件，无team_id过滤）
+    events = await repo.list_events(limit=10)
+
+    # 4. 最近一次会议
+    meetings = await repo.list_meetings(team.id)
+    recent_meeting = meetings[0] if meetings else None
+
+    # 5. 未完成任务（pending + running）
+    all_tasks = await repo.list_tasks(team.id)
+    pending_tasks = [
+        t for t in all_tasks
+        if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
+    ]
+
+    # 6. 生成 _hints 建议文本
+    idle_agents = [a for a in agents if a.status == AgentStatus.IDLE]
+    busy_agents = [a for a in agents if a.status == AgentStatus.BUSY]
+    hints: list[str] = []
+    if idle_agents:
+        names = ", ".join(a.name for a in idle_agents)
+        hints.append(f"{len(idle_agents)}个agent空闲，可分配任务: {names}")
+    if busy_agents:
+        descs = ", ".join(
+            f"{a.name}({a.current_task or '无描述'})" for a in busy_agents
+        )
+        hints.append(f"{len(busy_agents)}个agent工作中: {descs}")
+    if pending_tasks:
+        hints.append(f"{len(pending_tasks)}个任务待处理")
+    if not agents:
+        hints.append("团队暂无成员，请先添加agent")
+
+    return {
+        "success": True,
+        "data": {
+            "team": {
+                "id": team.id,
+                "name": team.name,
+                "mode": team.mode.value if hasattr(team.mode, "value") else str(team.mode),
+            },
+            "agents": [
+                {
+                    "name": a.name,
+                    "role": a.role,
+                    "status": a.status.value if hasattr(a.status, "value") else str(a.status),
+                    "current_task": a.current_task,
+                    "source": a.source,
+                }
+                for a in agents
+            ],
+            "recent_events": [
+                {
+                    "type": e.type.value if hasattr(e.type, "value") else str(e.type),
+                    "source": e.source,
+                    "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+                    "data": e.data,
+                }
+                for e in events
+            ],
+            "recent_meeting": {
+                "id": recent_meeting.id,
+                "topic": recent_meeting.topic,
+                "status": recent_meeting.status.value
+                if hasattr(recent_meeting.status, "value")
+                else str(recent_meeting.status),
+                "created_at": recent_meeting.created_at.isoformat()
+                if recent_meeting.created_at
+                else None,
+            }
+            if recent_meeting
+            else None,
+            "pending_tasks": [
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "status": t.status.value if hasattr(t.status, "value") else str(t.status),
+                    "assigned_to": t.assigned_to,
+                }
+                for t in pending_tasks
+            ],
+            "_hints": "; ".join(hints),
+        },
+    }

@@ -101,7 +101,7 @@ export function ProjectsPage() {
                 <TableRow>
                   <TableHead>名称</TableHead>
                   <TableHead>描述</TableHead>
-                  <TableHead>阶段数</TableHead>
+                  <TableHead>任务数</TableHead>
                   <TableHead>创建时间</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>

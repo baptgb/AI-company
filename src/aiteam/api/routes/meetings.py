@@ -6,8 +6,9 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 
-from aiteam.api.deps import get_event_bus, get_repository
+from aiteam.api.deps import get_event_bus, get_memory_store, get_repository
 from aiteam.api.event_bus import EventBus
+from aiteam.memory.store import MemoryStore
 from aiteam.api.schemas import (
     APIListResponse,
     APIResponse,
@@ -149,6 +150,7 @@ async def conclude_meeting(
     meeting_id: str,
     repo: StorageRepository = Depends(get_repository),
     event_bus: EventBus = Depends(get_event_bus),
+    memory_store: MemoryStore = Depends(get_memory_store),
 ) -> APIResponse[Meeting]:
     """结束会议."""
     meeting = await repo.get_meeting(meeting_id)
@@ -169,4 +171,17 @@ async def conclude_meeting(
             "topic": updated.topic,
         },
     )
-    return APIResponse(data=updated, message="会议已结束")
+
+    # 将会议结论自动存入团队记忆
+    messages = await repo.list_meeting_messages(meeting_id)
+    if messages:
+        last_msg = messages[-1]
+        conclusion = last_msg.content[:500]
+        await memory_store.store(
+            scope="team",
+            scope_id=updated.team_id,
+            content=f"[会议决策] {updated.topic}: {conclusion}",
+            metadata={"meeting_id": meeting_id, "topic": updated.topic},
+        )
+
+    return APIResponse(data=updated, message="会议已结束，结论已保存到团队记忆")
