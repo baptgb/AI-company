@@ -14,8 +14,9 @@ import {
 import { Users, Bot, ListTodo, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTeams } from '@/api/teams';
+import { useProjects } from '@/api/projects';
 import { apiFetch } from '@/api/client';
-import type { Team, TeamStatus, APIResponse } from '@/types';
+import type { Team, Project, TeamStatus, APIResponse } from '@/types';
 
 function StatCard({
   title,
@@ -76,28 +77,21 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function TeamOverviewCard({ team, status, loading }: { team: Team; status?: TeamStatus; loading: boolean }) {
+function ProjectOverviewCard({ project }: { project: Project }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">{team.name}</CardTitle>
-          <Badge variant="secondary">{team.mode}</Badge>
-        </div>
+        <CardTitle className="text-base">{project.name}</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <Skeleton className="h-4 w-24" />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {status?.agents.length ?? 0} 个 Agent · {status?.total_tasks ?? 0} 个任务
-          </p>
-        )}
+        <p className="text-sm text-muted-foreground">
+          {project.description || '暂无描述'}
+        </p>
         <Button
           variant="ghost"
           size="sm"
           className="mt-2 -ml-2"
-          render={<Link to={`/projects/${team.id}`} />}
+          render={<Link to={`/projects/${project.id}`} />}
         >
           查看详情
           <ArrowRight className="ml-1 h-3 w-3" />
@@ -108,6 +102,9 @@ function TeamOverviewCard({ team, status, loading }: { team: Team; status?: Team
 }
 
 export function DashboardPage() {
+  const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useProjects();
+  const projects = projectsData?.data ?? [];
+
   const { data, isLoading: teamsLoading, error } = useTeams();
   const teams = data?.data ?? [];
 
@@ -150,7 +147,7 @@ export function DashboardPage() {
 
   const allLoaded = teams.length > 0 && statusMap.size === teams.length;
 
-  if (teamsLoading) {
+  if (teamsLoading || projectsLoading) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -178,10 +175,10 @@ export function DashboardPage() {
     );
   }
 
-  if (error) {
+  if (error || projectsError) {
     return (
       <div className="py-12 text-center">
-        <p className="text-sm text-destructive">加载失败: {error.message}</p>
+        <p className="text-sm text-destructive">加载失败: {(error ?? projectsError)?.message}</p>
       </div>
     );
   }
@@ -192,7 +189,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="项目数量"
-          value={teams.length}
+          value={projects.length}
           description="已创建的项目总数"
           icon={Users}
         />
@@ -268,24 +265,22 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Team Overview */}
+      {/* Project Overview */}
       <Card>
         <CardHeader>
           <CardTitle>项目概览</CardTitle>
         </CardHeader>
         <CardContent>
-          {teams.length === 0 ? (
+          {projects.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               暂无项目，请先创建一个项目
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {teams.map((team, i) => (
-                <TeamOverviewCard
-                  key={team.id}
-                  team={team}
-                  status={statusMap.get(team.id)}
-                  loading={statusQueries[i]?.isLoading ?? false}
+              {projects.map((project) => (
+                <ProjectOverviewCard
+                  key={project.id}
+                  project={project}
                 />
               ))}
             </div>

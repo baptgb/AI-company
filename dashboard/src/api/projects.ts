@@ -44,3 +44,14 @@ export function useCreateProject() {
     },
   });
 }
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<APIResponse<null>>(`/api/projects/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}

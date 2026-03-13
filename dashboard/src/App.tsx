@@ -4,8 +4,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { DashboardPage } from '@/pages/DashboardPage';
-import { TeamsPage } from '@/pages/TeamsPage';
-import { TeamDetailPage } from '@/pages/TeamDetailPage';
+import { ProjectsPage } from '@/pages/ProjectsPage';
+import { ProjectDetailPage } from '@/pages/ProjectDetailPage';
 import { TasksPage } from '@/pages/TasksPage';
 import { EventsPage } from '@/pages/EventsPage';
 import { MeetingsPage } from '@/pages/MeetingsPage';
@@ -30,8 +30,8 @@ export default function App() {
             <Routes>
               <Route element={<AppLayout />}>
                 <Route index element={<DashboardPage />} />
-                <Route path="projects" element={<TeamsPage />} />
-                <Route path="projects/:teamId" element={<TeamDetailPage />} />
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="projects/:projectId" element={<ProjectDetailPage />} />
                 <Route path="tasks" element={<TasksPage />} />
                 <Route path="events" element={<EventsPage />} />
                 <Route path="meetings" element={<MeetingsPage />} />
