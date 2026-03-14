@@ -17,7 +17,7 @@ export function KanbanColumn({ title, count, badgeClassName, tasks, onTaskClick 
         <h3 className="text-sm font-medium">{title}</h3>
         <Badge className={badgeClassName}>{count}</Badge>
       </div>
-      <div className="flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-280px)] pr-1">
+      <div className="flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-320px)] pr-1">
         {tasks.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-8">
             暂无任务

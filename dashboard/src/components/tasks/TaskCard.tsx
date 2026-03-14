@@ -32,10 +32,10 @@ export function TaskCard({ task, onClick }: { task: Task; onClick: () => void })
 
   return (
     <Card
-      className="cursor-pointer transition-shadow hover:shadow-md"
+      className="cursor-pointer transition-shadow hover:shadow-md overflow-visible"
       onClick={onClick}
     >
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-sm font-medium leading-tight line-clamp-2">
             {task.title}
