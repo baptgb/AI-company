@@ -7,10 +7,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from aiteam.api.deps import get_event_bus, get_repository
-from aiteam.api.event_bus import EventBus
+from aiteam.api.deps import get_hook_translator
 from aiteam.api.hook_translator import HookTranslator
-from aiteam.storage.repository import StorageRepository
 
 router = APIRouter(prefix="/api/hooks", tags=["hooks"])
 
@@ -18,8 +16,7 @@ router = APIRouter(prefix="/api/hooks", tags=["hooks"])
 @router.post("/event")
 async def receive_hook_event(
     payload: dict,
-    repo: StorageRepository = Depends(get_repository),
-    event_bus: EventBus = Depends(get_event_bus),
+    translator: HookTranslator = Depends(get_hook_translator),
 ) -> dict:
     """统一接收Claude Code hook事件.
 
@@ -28,5 +25,4 @@ async def receive_hook_event(
     - PreToolUse/PostToolUse: 工具使用追踪
     - SessionStart/End: 会话生命周期管理与对账
     """
-    translator = HookTranslator(repo, event_bus)
     return await translator.handle_event(payload)

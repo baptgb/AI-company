@@ -7,12 +7,118 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from aiteam.api.event_bus import EventBus
 from aiteam.storage.repository import StorageRepository
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _FileEditRecord:
+    """单次文件编辑记录."""
+
+    agent_id: str
+    agent_name: str
+    timestamp: datetime
+
+
+@dataclass
+class _FileEditTracker:
+    """内存中的文件编辑追踪器 — O(1)冲突查询.
+
+    维护每个文件的最近编辑记录列表，支持：
+    1. 快速判断某文件是否被其他agent编辑过（冲突检测）
+    2. 统计热点文件（被多个agent编辑的文件）
+    3. 自动清理过期记录
+    """
+
+    # file_path -> list of recent edit records
+    _edits: dict[str, list[_FileEditRecord]] = field(
+        default_factory=lambda: defaultdict(list),
+    )
+    # 记录保留时长
+    _window: timedelta = field(default_factory=lambda: timedelta(minutes=10))
+
+    def record(self, file_path: str, agent_id: str, agent_name: str) -> None:
+        """记录一次文件编辑."""
+        self._edits[file_path].append(
+            _FileEditRecord(
+                agent_id=agent_id,
+                agent_name=agent_name,
+                timestamp=datetime.now(),
+            ),
+        )
+
+    def find_conflicts(
+        self, file_path: str, current_agent_id: str,
+        window_minutes: int = 5,
+    ) -> list[_FileEditRecord]:
+        """查找与当前agent冲突的其他agent的编辑记录.
+
+        Returns:
+            在时间窗口内编辑过同一文件的其他agent记录列表。
+        """
+        cutoff = datetime.now() - timedelta(minutes=window_minutes)
+        records = self._edits.get(file_path, [])
+        return [
+            r for r in records
+            if r.agent_id != current_agent_id and r.timestamp >= cutoff
+        ]
+
+    def get_hotspots(self, window_minutes: int = 10, min_agents: int = 2) -> list[dict]:
+        """获取热点文件 — 在时间窗口内被多个agent编辑的文件.
+
+        Returns:
+            热点文件列表，每项包含 file_path, agents, edit_count。
+        """
+        cutoff = datetime.now() - timedelta(minutes=window_minutes)
+        hotspots = []
+        for file_path, records in self._edits.items():
+            recent = [r for r in records if r.timestamp >= cutoff]
+            if not recent:
+                continue
+            unique_agents = {r.agent_name for r in recent}
+            if len(unique_agents) >= min_agents:
+                hotspots.append({
+                    "file_path": file_path,
+                    "agents": sorted(unique_agents),
+                    "edit_count": len(recent),
+                    "last_edit": max(r.timestamp for r in recent).isoformat(),
+                })
+        # 按编辑次数降序
+        hotspots.sort(key=lambda h: h["edit_count"], reverse=True)
+        return hotspots
+
+    def get_agent_files(self, agent_id: str, window_minutes: int = 10) -> list[str]:
+        """获取某agent近期正在编辑的文件列表."""
+        cutoff = datetime.now() - timedelta(minutes=window_minutes)
+        files = []
+        for file_path, records in self._edits.items():
+            if any(
+                r.agent_id == agent_id and r.timestamp >= cutoff
+                for r in records
+            ):
+                files.append(file_path)
+        return files
+
+    def cleanup(self) -> int:
+        """清理过期记录，返回清理数量."""
+        cutoff = datetime.now() - self._window
+        removed = 0
+        empty_keys = []
+        for file_path, records in self._edits.items():
+            before = len(records)
+            self._edits[file_path] = [r for r in records if r.timestamp >= cutoff]
+            removed += before - len(self._edits[file_path])
+            if not self._edits[file_path]:
+                empty_keys.append(file_path)
+        for k in empty_keys:
+            del self._edits[k]
+        return removed
 
 
 class HookTranslator:
@@ -24,6 +130,7 @@ class HookTranslator:
     def __init__(self, repo: StorageRepository, event_bus: EventBus) -> None:
         self.repo = repo
         self.event_bus = event_bus
+        self._file_tracker = _FileEditTracker()
 
     async def handle_event(self, payload: dict) -> dict:
         """统一事件处理入口."""
@@ -201,58 +308,138 @@ class HookTranslator:
         )
         logger.info("自愈: %s IDLE→BUSY (trigger=%s)", agent.name, trigger)
 
+    @staticmethod
+    def _extract_file_path(tool_input: dict | str) -> str:
+        """从工具输入中提取文件路径."""
+        if isinstance(tool_input, dict):
+            return tool_input.get("file_path", "") or tool_input.get("path", "")
+        return ""
+
     async def _check_file_edit_conflict(
         self, tool_name: str, tool_input: dict | str,
         target_agent_id: str, target_agent_name: str, session_id: str,
     ) -> None:
-        """检测文件编辑冲突 — 查询同session其他BUSY agent的近5分钟activity."""
+        """检测文件编辑冲突 — 使用内存追踪器O(1)查询 + DB回退.
+
+        增强点：
+        1. 内存追踪器优先：O(1)查询，不需要扫描DB
+        2. 精确file_path匹配：不再依赖input_summary子串匹配
+        3. 冲突严重度分级：同一文件被2个agent编辑 vs 3+个agent编辑
+        4. 记录到tracker供hotspot统计
+        """
         if tool_name not in self._FILE_EDIT_TOOLS:
             return
 
-        file_path = ""
-        if isinstance(tool_input, dict):
-            file_path = tool_input.get("file_path", "") or tool_input.get("path", "")
+        file_path = self._extract_file_path(tool_input)
         if not file_path:
             return
 
-        # 查找同session的其他BUSY agent
+        # 定期清理过期记录（每次检测时顺带清理，开销极小）
+        self._file_tracker.cleanup()
+
+        # 记录本次编辑
+        self._file_tracker.record(file_path, target_agent_id, target_agent_name)
+
+        # 使用内存追踪器查找冲突（O(1) lookup）
+        conflicts = self._file_tracker.find_conflicts(
+            file_path, target_agent_id, window_minutes=5,
+        )
+
+        if not conflicts:
+            # 内存追踪器无冲突 → DB回退（覆盖tracker重启后的冷启动）
+            conflicts = await self._db_fallback_conflict_check(
+                file_path, target_agent_id, session_id,
+            )
+
+        if not conflicts:
+            return
+
+        # 去重：同一agent只报一次
+        seen_agents: dict[str, _FileEditRecord] = {}
+        for c in conflicts:
+            if c.agent_id not in seen_agents:
+                seen_agents[c.agent_id] = c
+
+        # 冲突严重度
+        conflict_count = len(seen_agents)
+        severity = "high" if conflict_count >= 2 else "medium"
+
+        conflicting_agents = [
+            {"name": r.agent_name, "id": r.agent_id, "last_edit": r.timestamp.isoformat()}
+            for r in seen_agents.values()
+        ]
+
+        await self.event_bus.emit(
+            "file.edit_conflict",
+            f"file:{file_path}",
+            {
+                "file_path": file_path,
+                "current_agent_name": target_agent_name,
+                "current_agent_id": target_agent_id,
+                "conflicting_agents": conflicting_agents,
+                "severity": severity,
+                "session_id": session_id,
+            },
+        )
+        agent_names = ", ".join(r.agent_name for r in seen_agents.values())
+        logger.warning(
+            "文件编辑冲突[%s]: %s — %s (先) vs %s (后)",
+            severity, file_path, agent_names, target_agent_name,
+        )
+
+    async def _db_fallback_conflict_check(
+        self, file_path: str, current_agent_id: str, session_id: str,
+    ) -> list[_FileEditRecord]:
+        """DB回退冲突检测 — 当内存追踪器无数据时（冷启动）.
+
+        改进：直接匹配file_path而非子串匹配input_summary。
+        """
         session_agents = await self.repo.find_agents_by_session(session_id)
         other_busy = [
             a for a in session_agents
-            if a.id != target_agent_id and a.status == "busy"
+            if a.id != current_agent_id and a.status == "busy"
         ]
         if not other_busy:
-            return
+            return []
 
         cutoff = datetime.now() - timedelta(minutes=5)
+        conflicts: list[_FileEditRecord] = []
         for other in other_busy:
-            # 查询该agent最近的activity记录
             activities = await self.repo.list_activities(other.id, limit=20)
             for act in activities:
-                # 只看5分钟内的Edit/Write活动
                 if act.timestamp and act.timestamp < cutoff:
                     break
                 if act.tool_name not in self._FILE_EDIT_TOOLS:
                     continue
-                # 检查是否编辑了同一文件
-                if file_path in (act.input_summary or ""):
-                    await self.event_bus.emit(
-                        "file.edit_conflict",
-                        f"file:{file_path}",
-                        {
-                            "file_path": file_path,
-                            "previous_agent_name": other.name,
-                            "previous_agent_id": other.id,
-                            "current_agent_name": target_agent_name,
-                            "current_agent_id": target_agent_id,
-                            "session_id": session_id,
-                        },
+                # 改进：精确匹配file_path（规范化路径分隔符）
+                act_summary = (act.input_summary or "").replace("\\", "/")
+                normalized_path = file_path.replace("\\", "/")
+                if normalized_path == act_summary or normalized_path in act_summary:
+                    record = _FileEditRecord(
+                        agent_id=other.id,
+                        agent_name=other.name,
+                        timestamp=act.timestamp,
                     )
-                    logger.warning(
-                        "文件编辑冲突: %s — %s (先) vs %s (后)",
-                        file_path, other.name, target_agent_name,
+                    conflicts.append(record)
+                    # 同时补充到内存追踪器
+                    self._file_tracker.record(
+                        file_path, other.id, other.name,
                     )
-                    return  # 找到一个冲突即可，不需要重复记录
+                    break  # 每个agent只取最近一条
+        return conflicts
+
+    def get_file_hotspots(self, window_minutes: int = 10) -> list[dict]:
+        """获取热点文件信息 — 供team_briefing使用.
+
+        Returns:
+            被多个agent编辑的文件列表，含agents和edit_count。
+        """
+        self._file_tracker.cleanup()
+        return self._file_tracker.get_hotspots(window_minutes=window_minutes)
+
+    def get_agent_editing_files(self, agent_id: str) -> list[str]:
+        """获取某agent近期正在编辑的文件 — 供agent注册时告知."""
+        return self._file_tracker.get_agent_files(agent_id)
 
     async def _on_pre_tool_use(self, payload: dict) -> dict:
         """记录工具使用事件.
@@ -267,16 +454,25 @@ class HookTranslator:
         cc_agent_id = payload.get("agent_id", "")
         tool_input = payload.get("tool_input", {})
 
-        # 提取输入摘要
+        # 提取输入摘要 — 文件编辑工具优先存储file_path以支持冲突检测
         input_summary = ""
         if isinstance(tool_input, dict):
-            input_summary = (
-                tool_input.get("description", "")
-                or tool_input.get("command", "")
-                or tool_input.get("file_path", "")
-                or tool_input.get("pattern", "")
-                or str(tool_input)[:200]
-            )
+            if tool_name in self._FILE_EDIT_TOOLS:
+                # Edit/Write工具：file_path优先，确保DB回退冲突检测可用
+                input_summary = (
+                    tool_input.get("file_path", "")
+                    or tool_input.get("path", "")
+                    or tool_input.get("description", "")
+                    or str(tool_input)[:200]
+                )
+            else:
+                input_summary = (
+                    tool_input.get("description", "")
+                    or tool_input.get("command", "")
+                    or tool_input.get("file_path", "")
+                    or tool_input.get("pattern", "")
+                    or str(tool_input)[:200]
+                )
         elif isinstance(tool_input, str):
             input_summary = tool_input[:200]
 
@@ -313,10 +509,13 @@ class HookTranslator:
                 pass  # current_task列可能尚未生效
 
             # 文件编辑冲突检测（仅记录事件，不阻止操作）
-            await self._check_file_edit_conflict(
-                tool_name, tool_input,
-                target_agent.id, target_agent.name, session_id,
-            )
+            try:
+                await self._check_file_edit_conflict(
+                    tool_name, tool_input,
+                    target_agent.id, target_agent.name, session_id,
+                )
+            except Exception as exc:
+                logger.warning("冲突检测异常（不影响工具使用）: %s", exc)
 
         await self.event_bus.emit(
             "cc.tool_use",

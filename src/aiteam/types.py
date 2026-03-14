@@ -118,6 +118,14 @@ class EventType(str, enum.Enum):
     CC_SESSION_START = "cc.session_start"
     CC_SESSION_END = "cc.session_end"
 
+    # File events
+    FILE_EDIT_CONFLICT = "file.edit_conflict"
+
+    # Task dependency events
+    TASK_DECOMPOSED = "task.decomposed"
+    TASK_BLOCKED = "task.blocked"
+    TASK_UNBLOCKED = "task.unblocked"
+
     # System events
     SYSTEM_STARTED = "system.started"
     SYSTEM_STOPPED = "system.stopped"

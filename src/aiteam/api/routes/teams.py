@@ -6,7 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
-from aiteam.api.deps import get_manager, get_repository
+from aiteam.api.deps import get_hook_translator, get_manager, get_repository
+from aiteam.api.hook_translator import HookTranslator
 from aiteam.api.schemas import (
     APIListResponse,
     APIResponse,
@@ -114,6 +115,7 @@ async def team_briefing(
     team_id: str,
     manager: TeamManager = Depends(get_manager),
     repo: StorageRepository = Depends(get_repository),
+    hook_translator: HookTranslator = Depends(get_hook_translator),
 ) -> dict[str, Any]:
     """获取团队全景简报 — 一次调用了解团队全部状态。
 
@@ -155,6 +157,15 @@ async def team_briefing(
         hints.append(f"{len(pending_tasks)}个任务待处理")
     if not agents:
         hints.append("团队暂无成员，请先添加agent")
+
+    # 7. 热点文件检测（被多个agent编辑的文件）
+    file_hotspots = hook_translator.get_file_hotspots(window_minutes=10)
+    if file_hotspots:
+        hotspot_desc = ", ".join(
+            f"{h['file_path']}({'+'.join(h['agents'])})"
+            for h in file_hotspots[:3]
+        )
+        hints.append(f"文件编辑热点: {hotspot_desc}")
 
     return {
         "success": True,
@@ -204,6 +215,7 @@ async def team_briefing(
                 }
                 for t in pending_tasks
             ],
+            "file_hotspots": file_hotspots,
             "_hints": "; ".join(hints),
         },
     }

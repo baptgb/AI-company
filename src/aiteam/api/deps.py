@@ -10,6 +10,7 @@ import logging
 from sqlalchemy import inspect, text
 
 from aiteam.api.event_bus import EventBus
+from aiteam.api.hook_translator import HookTranslator
 from aiteam.api.state_reaper import StateReaper
 from aiteam.memory.store import MemoryStore
 from aiteam.orchestrator.team_manager import TeamManager
@@ -25,6 +26,7 @@ _memory_store: MemoryStore | None = None
 _event_bus: EventBus | None = None
 _manager: TeamManager | None = None
 _reaper: StateReaper | None = None
+_hook_translator: HookTranslator | None = None
 
 
 async def _run_migrations(db_url: str | None = None) -> None:
@@ -119,7 +121,7 @@ async def _startup_reconciliation(repo: StorageRepository) -> None:
 
 async def init_dependencies() -> None:
     """初始化所有依赖（lifespan startup时调用）."""
-    global _repository, _memory_store, _event_bus, _manager, _reaper  # noqa: PLW0603
+    global _repository, _memory_store, _event_bus, _manager, _reaper, _hook_translator  # noqa: PLW0603
 
     _repository = StorageRepository()
     await _repository.init_db()
@@ -132,6 +134,7 @@ async def init_dependencies() -> None:
     _manager = TeamManager(
         repository=_repository, memory=_memory_store, event_bus=_event_bus,
     )
+    _hook_translator = HookTranslator(repo=_repository, event_bus=_event_bus)
 
     # 启动对账：清除残留BUSY状态
     await _startup_reconciliation(_repository)
@@ -146,7 +149,7 @@ async def init_dependencies() -> None:
 
 async def cleanup_dependencies() -> None:
     """清理所有依赖（lifespan shutdown时调用）."""
-    global _repository, _memory_store, _event_bus, _manager, _reaper  # noqa: PLW0603
+    global _repository, _memory_store, _event_bus, _manager, _reaper, _hook_translator  # noqa: PLW0603
 
     # 先停止StateReaper
     if _reaper is not None:
@@ -158,6 +161,7 @@ async def cleanup_dependencies() -> None:
     _memory_store = None
     _event_bus = None
     _manager = None
+    _hook_translator = None
 
 
 def get_manager() -> TeamManager:
@@ -190,3 +194,11 @@ def get_event_bus() -> EventBus:
         msg = "EventBus 尚未初始化，请确保应用已启动"
         raise RuntimeError(msg)
     return _event_bus
+
+
+def get_hook_translator() -> HookTranslator:
+    """获取 HookTranslator 单例，通过 FastAPI Depends() 注入."""
+    if _hook_translator is None:
+        msg = "HookTranslator 尚未初始化，请确保应用已启动"
+        raise RuntimeError(msg)
+    return _hook_translator
