@@ -347,17 +347,20 @@ def task_run(
     description: str,
     title: str = "",
     model: str | None = None,
+    depends_on: list[str] | None = None,
 ) -> dict[str, Any]:
     """在团队中创建一个任务，等待Agent领取执行。
 
     自动检测与已有任务的相似度，若发现相似任务会在 related_tasks 字段中返回警告。
     任务创建后状态为 pending，CC Agent 可通过 team_briefing 查看待办任务并领取。
+    如果指定了 depends_on，任务将标记为 blocked 直到所有依赖任务完成。
 
     Args:
         team_id: 团队 ID 或名称
         description: 任务描述
         title: 任务标题（可选）
         model: 指定使用的模型（可选，仅记录元数据）
+        depends_on: 依赖的任务ID列表（可选，任务将在依赖完成后自动解锁）
 
     Returns:
         创建的任务信息 + related_tasks（相似任务列表，如有）
@@ -367,7 +370,53 @@ def task_run(
         payload["title"] = title
     if model:
         payload["model"] = model
+    if depends_on:
+        payload["depends_on"] = depends_on
     return _api_call("POST", f"/api/teams/{team_id}/tasks/run", payload)
+
+
+# ============================================================
+# Tool: task_decompose
+# ============================================================
+
+
+@mcp.tool()
+def task_decompose(
+    team_id: str,
+    title: str,
+    description: str = "",
+    template: str = "",
+    subtasks: list[dict[str, str]] | None = None,
+    auto_assign: bool = False,
+) -> dict[str, Any]:
+    """将一个大任务拆解为父任务+子任务。
+
+    支持两种方式：
+    1. 使用内置模板（template）自动生成子任务
+    2. 手动指定子任务列表（subtasks）
+
+    可用模板: web-app, api-service, data-pipeline, library, refactor, bugfix
+
+    Args:
+        team_id: 团队 ID 或名称
+        title: 父任务标题
+        description: 父任务描述
+        template: 内置模板名称（可选）
+        subtasks: 自定义子任务列表，每项含 title 和可选 description（可选）
+        auto_assign: 是否自动分配给匹配角色的 Agent（暂未实现）
+
+    Returns:
+        父任务 + 子任务列表
+    """
+    payload: dict[str, Any] = {
+        "title": title,
+        "description": description,
+        "template": template,
+        "auto_assign": auto_assign,
+    }
+    if subtasks:
+        payload["subtasks"] = subtasks
+    return _api_call("POST", f"/api/teams/{team_id}/tasks/decompose", payload)
 
 
 # ============================================================

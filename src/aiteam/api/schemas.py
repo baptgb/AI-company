@@ -77,6 +77,7 @@ class TaskRun(BaseModel):
     description: str
     title: str = ""
     model: str | None = None
+    depends_on: list[str] = Field(default_factory=list)
 
 
 class MemoryQuery(BaseModel):
@@ -132,6 +133,23 @@ class MeetingCreate(BaseModel):
 
     topic: str
     participants: list[str] = Field(default_factory=list)
+
+
+class SubtaskInput(BaseModel):
+    """子任务输入."""
+
+    title: str
+    description: str = ""
+
+
+class TaskDecompose(BaseModel):
+    """任务拆解请求."""
+
+    title: str
+    description: str = ""
+    template: str = ""  # web-app/api-service/data-pipeline/library/refactor/bugfix
+    subtasks: list[SubtaskInput] | None = None
+    auto_assign: bool = False
 
 
 class MeetingMessageCreate(BaseModel):

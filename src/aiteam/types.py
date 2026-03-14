@@ -33,6 +33,7 @@ class TaskStatus(str, enum.Enum):
     """任务状态."""
 
     PENDING = "pending"
+    BLOCKED = "blocked"  # 有未完成的依赖
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -216,6 +217,10 @@ class Task(BaseModel):
     result: str | None = None
     parent_id: str | None = None
     project_id: str | None = None
+    depends_on: list[str] = Field(default_factory=list)  # 依赖的task_id列表
+    depth: int = 0  # 层级深度（0=顶级，1=子任务）
+    order: int = 0  # 同级排序
+    template_id: str | None = None  # 来源模板标识
     created_at: datetime = Field(default_factory=datetime.now)
     started_at: datetime | None = None
     completed_at: datetime | None = None

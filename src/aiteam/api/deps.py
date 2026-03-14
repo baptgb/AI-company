@@ -44,6 +44,11 @@ async def _run_migrations(db_url: str | None = None) -> None:
         ("agents", "project_id", "VARCHAR(36)"),
         ("agents", "current_phase_id", "VARCHAR(36)"),
         ("tasks", "project_id", "VARCHAR(36)"),
+        ("tasks", "parent_id", "VARCHAR(36)"),
+        ("tasks", "depends_on", "JSON DEFAULT '[]'"),
+        ("tasks", "depth", "INTEGER DEFAULT 0"),
+        ("tasks", "order", 'INTEGER DEFAULT 0'),
+        ("tasks", "template_id", "VARCHAR(50)"),
         ("meetings", "project_id", "VARCHAR(36)"),
     ]
 

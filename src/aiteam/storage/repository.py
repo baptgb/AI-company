@@ -435,11 +435,27 @@ class StorageRepository:
             description=description,
             assigned_to=kwargs.get("assigned_to"),  # type: ignore[arg-type]
             parent_id=kwargs.get("parent_id"),  # type: ignore[arg-type]
+            depends_on=kwargs.get("depends_on", []),  # type: ignore[arg-type]
+            depth=kwargs.get("depth", 0),  # type: ignore[arg-type]
+            order=kwargs.get("order", 0),  # type: ignore[arg-type]
+            template_id=kwargs.get("template_id"),  # type: ignore[arg-type]
         )
         orm = TaskModel.from_pydantic(task)
         async with get_session(self._db_url) as session:
             session.add(orm)
         return task
+
+    async def list_subtasks(self, parent_id: str) -> list[Task]:
+        """列出某任务的所有子任务，按order排序."""
+        async with get_session(self._db_url) as session:
+            stmt = (
+                select(TaskModel)
+                .where(TaskModel.parent_id == parent_id)
+                .order_by(TaskModel.order, TaskModel.created_at)
+            )
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [r.to_pydantic() for r in rows]
 
     async def get_task(self, task_id: str) -> Task | None:
         """根据 ID 获取任务."""
@@ -487,6 +503,83 @@ class StorageRepository:
                     setattr(row, key, value)
 
             return row.to_pydantic()
+
+    async def get_downstream_tasks(self, task_id: str) -> list[Task]:
+        """查找所有depends_on包含task_id的任务（即依赖此任务的下游任务）."""
+        async with get_session(self._db_url) as session:
+            # depends_on在SQLite中存为JSON数组，需遍历所有任务检查
+            result = await session.execute(select(TaskModel))
+            rows = result.scalars().all()
+            downstream = []
+            for row in rows:
+                deps = row.depends_on if isinstance(row.depends_on, list) else []
+                if task_id in deps:
+                    downstream.append(row.to_pydantic())
+            return downstream
+
+    async def resolve_task_dependencies(self, task_id: str) -> list[Task]:
+        """任务完成时的级联解锁.
+
+        检查所有依赖此task_id的下游BLOCKED任务，
+        如果其所有依赖都已完成则解锁为PENDING。
+
+        Returns:
+            被解锁的任务列表.
+        """
+        downstream = await self.get_downstream_tasks(task_id)
+        unblocked: list[Task] = []
+
+        for task in downstream:
+            if task.status != TaskStatus.BLOCKED:
+                continue
+
+            # 检查该任务的所有依赖是否都已完成
+            all_deps_done = True
+            for dep_id in task.depends_on:
+                dep_task = await self.get_task(dep_id)
+                if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
+                    all_deps_done = False
+                    break
+
+            if all_deps_done:
+                updated = await self.update_task(task.id, status=TaskStatus.PENDING.value)
+                unblocked.append(updated)
+
+        return unblocked
+
+    async def detect_dependency_cycle(self, task_id: str, new_dep_id: str) -> bool:
+        """检测添加依赖后是否产生环.
+
+        从new_dep_id出发沿depends_on链向上追溯，
+        如果能回到task_id则说明会形成环。
+
+        Returns:
+            True 表示存在环，False 表示安全.
+        """
+        # 如果自己依赖自己，直接是环
+        if task_id == new_dep_id:
+            return True
+
+        visited: set[str] = set()
+        stack = [new_dep_id]
+
+        while stack:
+            current_id = stack.pop()
+            if current_id in visited:
+                continue
+            visited.add(current_id)
+
+            current_task = await self.get_task(current_id)
+            if current_task is None:
+                continue
+
+            for dep_id in current_task.depends_on:
+                if dep_id == task_id:
+                    return True  # 找到环
+                if dep_id not in visited:
+                    stack.append(dep_id)
+
+        return False
 
     # ================================================================
     # Events

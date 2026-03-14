@@ -264,6 +264,10 @@ class TaskModel(Base):
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
     parent_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    depends_on: Mapped[dict[str, Any]] = mapped_column(JSON, default=list)
+    depth: Mapped[int] = mapped_column(default=0)
+    order: Mapped[int] = mapped_column(default=0)
+    template_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -280,6 +284,10 @@ class TaskModel(Base):
             result=self.result,
             parent_id=self.parent_id,
             project_id=self.project_id,
+            depends_on=self.depends_on if isinstance(self.depends_on, list) else [],
+            depth=self.depth or 0,
+            order=self.order or 0,
+            template_id=self.template_id,
             created_at=self.created_at,
             started_at=self.started_at,
             completed_at=self.completed_at,
@@ -298,6 +306,10 @@ class TaskModel(Base):
             result=task.result,
             parent_id=task.parent_id,
             project_id=task.project_id,
+            depends_on=task.depends_on,
+            depth=task.depth,
+            order=task.order,
+            template_id=task.template_id,
             created_at=task.created_at,
             started_at=task.started_at,
             completed_at=task.completed_at,

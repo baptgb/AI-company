@@ -134,12 +134,16 @@ async def team_briefing(
     meetings = await repo.list_meetings(team.id)
     recent_meeting = meetings[0] if meetings else None
 
-    # 5. 未完成任务（pending + running）
+    # 5. 未完成任务（pending + running + blocked）
     all_tasks = await repo.list_tasks(team.id)
     pending_tasks = [
         t for t in all_tasks
-        if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
+        if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.BLOCKED)
     ]
+    # 排序：ready任务(pending/running)在前，blocked在后
+    ready_tasks = [t for t in pending_tasks if t.status != TaskStatus.BLOCKED]
+    blocked_tasks = [t for t in pending_tasks if t.status == TaskStatus.BLOCKED]
+    pending_tasks = ready_tasks + blocked_tasks
 
     # 6. 生成 _hints 建议文本
     idle_agents = [a for a in agents if a.status == AgentStatus.IDLE]
@@ -153,8 +157,8 @@ async def team_briefing(
             f"{a.name}({a.current_task or '无描述'})" for a in busy_agents
         )
         hints.append(f"{len(busy_agents)}个agent工作中: {descs}")
-    if pending_tasks:
-        hints.append(f"{len(pending_tasks)}个任务待处理")
+    if ready_tasks or blocked_tasks:
+        hints.append(f"{len(ready_tasks)}个任务可执行，{len(blocked_tasks)}个被阻塞")
     if not agents:
         hints.append("团队暂无成员，请先添加agent")
 
@@ -212,6 +216,9 @@ async def team_briefing(
                     "title": t.title,
                     "status": t.status.value if hasattr(t.status, "value") else str(t.status),
                     "assigned_to": t.assigned_to,
+                    "depends_on": t.depends_on,
+                    "depth": t.depth,
+                    "parent_id": t.parent_id,
                 }
                 for t in pending_tasks
             ],
