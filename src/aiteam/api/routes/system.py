@@ -200,6 +200,13 @@ _ADVISORY_RULES: list[dict] = [
         "advice": "并行处理的短期任务不超过3个，避免混乱。等待期间分析任务墙、分派新任务、审查代码",
     },
     {
+        "id": "B0.8",
+        "category": "leadership",
+        "name": "每次实施后同步QA观察任务",
+        "description": "每完成一个功能实施后，Leader必须主动告知QA：做了什么、改了哪里、预期表现是什么、怎么验证",
+        "advice": "QA不能自己发现新功能——Leader不同步就QA不知道要测什么。格式：'刚实施了X功能，改了Y文件，预期Z行为，请验证'",
+    },
+    {
         "id": "B1",
         "category": "coordination",
         "name": "文件驱动协调",
