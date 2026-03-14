@@ -95,6 +95,26 @@ PUT http://localhost:8000/api/meetings/{meeting_id}/conclude
 2. Round 2+: 必须先读取前人发言，引用并回应具体观点
 3. 最后一轮: 汇总共识和分歧
 
+## Leader 上下文管理协议
+
+当收到 `[CONTEXT WARNING]` 或 `[CONTEXT CRITICAL]` 提醒时，按以下流程操作：
+
+### 80% WARNING
+1. **完成当前节点** — 不要半途中断，完成正在进行的最小原子任务
+2. **保存进度** — 更新 memory 文件，记录：已完成的任务、当前进行中的任务、下一步计划
+3. **提醒用户** — 告诉用户"上下文使用率已达80%，建议执行 /compact"
+
+### 90% CRITICAL
+1. **立即停止** — 不开始任何新任务
+2. **紧急保存** — 立即将所有进度写入 memory 文件
+3. **强烈提醒** — 告诉用户"上下文即将耗尽，请立即执行 /compact"
+
+### Compact 后恢复
+compact 后重新开始时：
+1. 读取 memory 文件恢复项目状态和进度
+2. 读取 CLAUDE.md 恢复项目规则
+3. 继续之前未完成的任务
+
 ## 约束
 - 不自建LLM Provider抽象层，直接使用LangChain ChatModel
 - 不做具体投资建议或交易信号（继承自研究项目约束）

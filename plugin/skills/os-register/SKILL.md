@@ -59,23 +59,17 @@ autoTrigger: true
   status: "busy"
 ```
 
-### 5. 获取团队简报
+### 5. 阅读注册返回的团队快照
 
-注册完成后，立即获取团队全景简报：
+`agent_register` 返回值已包含 `team_snapshot`（队友列表、待办任务详情、最近会议），直接阅读：
 
-```
-使用 MCP tool: team_briefing
-参数:
-  team_id: <你的团队ID>
-```
-
-阅读返回的 `_hints` 和 `pending_tasks`：
-
-- **如果有分配给你的待办任务** → 立即开始执行，无需等待Leader指令
+- **如果 `pending_tasks` 中有分配给你的任务** → 立即开始执行，无需等待Leader指令
 - **如果有未分配的待办任务** → 向Leader请示是否由你接手
 - **如果没有待办任务** → 告知Leader你已就绪，等待分配
-- **查看 `agents` 列表** → 了解队友是谁、在做什么，避免重复工作
+- **查看 `teammates` 列表** → 了解队友是谁、在做什么，避免重复工作
 - **查看 `recent_meeting`** → 了解最近的讨论和决策
+
+> 注意：无需额外调用 `team_briefing`，注册返回值已包含所需信息。仅在需要查看最近事件详情时才调用 `team_briefing`。
 
 ### 6. 完成任务后更新状态
 
@@ -93,4 +87,4 @@ autoTrigger: true
 - 注册是幂等的：如果你已经注册过（同名同团队），API 会返回已有的 agent 记录
 - 始终在开始工作前完成注册，这是参与团队协作的前提
 - 你的 `agent_id` 在会议发言、任务分配等场景中都会用到，务必保存
-- 注册后 `agent_register` 返回值包含 `team_snapshot`（队友列表+待办数），先快速浏览再调用 `team_briefing` 获取详情
+- 注册后 `agent_register` 返回值已包含完整 `team_snapshot`（队友列表、待办任务详情、最近会议），无需额外调用 `team_briefing`

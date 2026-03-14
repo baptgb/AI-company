@@ -48,14 +48,18 @@ async def add_agent(
         model=body.model,
     )
 
-    # 获取团队快照：当前所有agent和待办任务数
+    # 获取团队快照：当前所有agent、待办任务和最近会议
     team = await manager.get_team(team_id)
     all_agents = await repo.list_agents(team.id)
     all_tasks = await repo.list_tasks(team.id)
-    pending_count = sum(
-        1 for t in all_tasks
+    pending_tasks = [
+        t for t in all_tasks
         if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
-    )
+    ]
+
+    # 最近一次会议
+    meetings = await repo.list_meetings(team.id)
+    recent_meeting = meetings[0] if meetings else None
 
     # 构建teammates列表（排除刚注册的自己）
     teammates = [
@@ -82,7 +86,24 @@ async def add_agent(
                 }
                 for a in all_agents
             ],
-            "pending_tasks_count": pending_count,
+            "pending_tasks": [
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "status": t.status.value if hasattr(t.status, "value") else str(t.status),
+                    "assigned_to": t.assigned_to,
+                }
+                for t in pending_tasks
+            ],
+            "recent_meeting": {
+                "id": recent_meeting.id,
+                "topic": recent_meeting.topic,
+                "status": recent_meeting.status.value
+                if hasattr(recent_meeting.status, "value")
+                else str(recent_meeting.status),
+            }
+            if recent_meeting
+            else None,
         },
     }
 

@@ -555,8 +555,26 @@ class HookTranslator:
                 # leader的团队就是目标团队
                 return await self.repo.get_team(agents[0].team_id)
 
-        # 策略2: 返回最近创建的团队
+        # 策略2: 通过cwd匹配项目，找到关联的团队
+        cwd = payload.get("cwd", "")
         teams = await self.repo.list_teams()
+        if teams and cwd:
+            # 2a: 尝试通过cwd找到所属项目的团队
+            projects = await self.repo.list_projects()
+            for proj in projects:
+                if proj.root_path and cwd.replace("\\", "/").startswith(proj.root_path.replace("\\", "/")):
+                    proj_teams = [t for t in teams if t.project_id == proj.id]
+                    if proj_teams:
+                        return proj_teams[0]
+            # 2b: 没有项目匹配，且只有一个团队时安全返回
+            if len(teams) == 1:
+                return teams[0]
+            # 2c: 多团队无法确定，返回最近创建的（并记录警告）
+            logger.warning(
+                "多团队无法确定归属(cwd=%s, teams=%d)，fallback到最近创建的团队",
+                cwd, len(teams),
+            )
+            return teams[0]
         if teams:
             return teams[0]
 

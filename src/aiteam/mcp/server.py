@@ -1,6 +1,6 @@
 """AI Team OS — MCP Server.
 
-提供 19 个 MCP tools，通过 HTTP 调用本地 FastAPI (localhost:8000) 的对应 API 端点。
+提供 20 个 MCP tools，通过 HTTP 调用本地 FastAPI (localhost:8000) 的对应 API 端点。
 MCP Server 以 stdio 模式运行，与 FastAPI 进程完全解耦。
 """
 
@@ -153,7 +153,7 @@ def agent_register(
 
     注册成功后返回:
     - teammates: 当前团队其他成员列表（name/role/status/current_task）
-    - team_snapshot: 所有成员状态和待办任务数
+    - team_snapshot: 所有成员状态、待办任务详情、最近会议（无需额外调用 team_briefing）
 
     Args:
         team_id: 目标团队 ID 或名称
@@ -163,7 +163,7 @@ def agent_register(
         system_prompt: Agent 的系统提示词
 
     Returns:
-        Agent 信息 + teammates 列表 + team_snapshot
+        Agent 信息 + teammates 列表 + team_snapshot（含 pending_tasks 和 recent_meeting）
     """
     return _api_call("POST", f"/api/teams/{team_id}/agents", {
         "name": name,
