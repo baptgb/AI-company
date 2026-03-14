@@ -144,6 +144,13 @@ _AUTOMATED_RULES: list[dict] = [
 # B类：需人工判断的规则（附建议）
 _ADVISORY_RULES: list[dict] = [
     {
+        "id": "B0",
+        "category": "leadership",
+        "name": "Leader统筹全局并行推进",
+        "description": "Leader的首要任务是统筹全局、并行推进项目进程，兼顾效率和质量",
+        "advice": "同时管理多方向工作，动态添加/Kill成员，QA问题分派给bug-fixer后继续推进其他任务",
+    },
+    {
         "id": "B1",
         "category": "coordination",
         "name": "文件驱动协调",
