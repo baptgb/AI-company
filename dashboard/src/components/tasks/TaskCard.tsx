@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { RelativeTime } from '@/components/shared/RelativeTime';
+import { Users, User } from 'lucide-react';
 import type { Task } from '@/types';
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -56,6 +57,23 @@ export function TaskCard({ task, onClick }: { task: Task; onClick: () => void })
             </span>
           )}
         </div>
+        {/* 团队名称 + 负责人 */}
+        {(task.team_name || task.assigned_to) && (
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            {task.team_name && (
+              <span className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {task.team_name}
+              </span>
+            )}
+            {task.assigned_to && (
+              <span className="flex items-center gap-1">
+                <User className="h-3 w-3" />
+                {task.assigned_to}
+              </span>
+            )}
+          </div>
+        )}
         {task.tags?.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap">
             {task.tags.map((tag) => (

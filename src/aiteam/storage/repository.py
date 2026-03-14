@@ -284,6 +284,17 @@ class StorageRepository:
             rows = result.scalars().all()
             return [r.to_pydantic() for r in rows]
 
+    async def list_teams_by_project(self, project_id: str) -> list[Team]:
+        """列出项目下所有团队."""
+        async with get_session(self._db_url) as session:
+            result = await session.execute(
+                select(TeamModel)
+                .where(TeamModel.project_id == project_id)
+                .order_by(TeamModel.created_at.desc())
+            )
+            rows = result.scalars().all()
+            return [r.to_pydantic() for r in rows]
+
     async def find_active_team_by_leader(self, leader_agent_id: str) -> Team | None:
         """查找Leader当前领导的active团队."""
         async with get_session(self._db_url) as session:
@@ -432,7 +443,8 @@ class StorageRepository:
         # 构建可选参数
         optional: dict[str, object] = {}
         for key in ("assigned_to", "parent_id", "depends_on", "depth",
-                     "order", "template_id", "priority", "horizon", "tags"):
+                     "order", "template_id", "priority", "horizon", "tags",
+                     "config"):
             if key in kwargs:
                 optional[key] = kwargs[key]
         # 设置默认值

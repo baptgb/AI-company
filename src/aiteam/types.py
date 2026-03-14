@@ -253,6 +253,7 @@ class Task(BaseModel):
     priority: TaskPriority = TaskPriority.MEDIUM
     horizon: TaskHorizon = TaskHorizon.SHORT
     tags: list[str] = Field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.now)
     started_at: datetime | None = None
     completed_at: datetime | None = None

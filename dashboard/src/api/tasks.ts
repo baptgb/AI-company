@@ -18,6 +18,14 @@ export function useTaskWall(teamId: string) {
   });
 }
 
+export function useProjectTaskWall(projectId: string) {
+  return useQuery({
+    queryKey: ['project-task-wall', projectId],
+    queryFn: () => apiFetch<TaskWallResponse>(`/api/projects/${projectId}/task-wall`),
+    enabled: !!projectId,
+  });
+}
+
 export function useTask(id: string) {
   return useQuery({
     queryKey: ['tasks', id],
@@ -36,6 +44,8 @@ export function useRunTask() {
       }),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['teams', variables.team_id, 'tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['project-task-wall'] });
+      void queryClient.invalidateQueries({ queryKey: ['task-wall', variables.team_id] });
     },
   });
 }

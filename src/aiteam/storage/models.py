@@ -273,6 +273,7 @@ class TaskModel(Base):
     priority: Mapped[str] = mapped_column(String(20), default="medium")
     horizon: Mapped[str] = mapped_column(String(20), default="short")
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -296,6 +297,7 @@ class TaskModel(Base):
             priority=TaskPriority(self.priority) if self.priority else TaskPriority.MEDIUM,
             horizon=TaskHorizon(self.horizon) if self.horizon else TaskHorizon.SHORT,
             tags=self.tags if isinstance(self.tags, list) else [],
+            config=self.config if isinstance(self.config, dict) else {},
             created_at=self.created_at,
             started_at=self.started_at,
             completed_at=self.completed_at,
@@ -321,6 +323,7 @@ class TaskModel(Base):
             priority=task.priority.value,
             horizon=task.horizon.value,
             tags=task.tags,
+            config=task.config,
             created_at=task.created_at,
             started_at=task.started_at,
             completed_at=task.completed_at,

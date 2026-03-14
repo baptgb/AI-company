@@ -39,6 +39,8 @@ export interface Task {
   horizon: 'short' | 'mid' | 'long';
   tags: string[];
   score?: number;
+  assigned_to?: string | null;
+  team_name?: string;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -50,11 +52,13 @@ export interface TaskWallResponse {
     mid: Task[];
     long: Task[];
   };
+  completed?: Task[];
   stats: {
     total: number;
     by_priority: Record<string, number>;
     by_status: Record<string, number>;
     avg_score: number;
+    completed_count?: number;
   };
 }
 

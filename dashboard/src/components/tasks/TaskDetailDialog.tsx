@@ -52,13 +52,25 @@ export function TaskDetailDialog({
         </DialogHeader>
 
         {/* Meta info */}
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-3 text-sm flex-wrap">
           <span className="text-muted-foreground">周期:</span>
           <span>{HORIZON_LABEL[task.horizon] ?? task.horizon}</span>
           {task.score != null && (
             <>
               <span className="text-muted-foreground">评分:</span>
               <span className="font-mono">{task.score.toFixed(1)}</span>
+            </>
+          )}
+          {task.team_name && (
+            <>
+              <span className="text-muted-foreground">团队:</span>
+              <span>{task.team_name}</span>
+            </>
+          )}
+          {task.assigned_to && (
+            <>
+              <span className="text-muted-foreground">负责人:</span>
+              <span>{task.assigned_to}</span>
             </>
           )}
         </div>

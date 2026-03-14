@@ -52,6 +52,7 @@ async def _run_migrations(db_url: str | None = None) -> None:
         ("tasks", "order", 'INTEGER DEFAULT 0'),
         ("tasks", "template_id", "VARCHAR(50)"),
         ("meetings", "project_id", "VARCHAR(36)"),
+        ("tasks", "config", "JSON DEFAULT '{}'"),
     ]
 
     async with engine.connect() as conn:
