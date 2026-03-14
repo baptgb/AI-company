@@ -183,7 +183,7 @@ _ADVISORY_RULES: list[dict] = [
         "category": "leadership",
         "name": "任务墙灵活领取——不局限短期",
         "description": "Leader根据项目进度判断，可直接领取中/长期任务开始实施，不必只做短期",
-        "advice": "中长期任务需要时用task_decompose拆分为短期子任务再执行。优先级和时机由Leader自主判断",
+        "advice": "中长期任务需要时用task_decompose拆分为短期子任务再执行。拆分后决定暂不实施的应撤回子任务，避免僵尸任务污染任务墙",
     },
     {
         "id": "B1",
