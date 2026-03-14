@@ -176,9 +176,9 @@ def agent_register(
 ) -> dict[str, Any]:
     """向团队注册一个新的 AI Agent。
 
-    注册成功后返回:
-    - teammates: 当前团队其他成员列表（name/role/status/current_task）
-    - team_snapshot: 所有成员状态、待办任务详情、最近会议（无需额外调用 team_briefing）
+    注册成功后状态自动设为busy。
+    规则：一次性任务完成后Leader应Kill该Agent，可能有后续任务的保留。
+    工具受限时报告Leader解决。
 
     Args:
         team_id: 目标团队 ID 或名称
@@ -250,6 +250,9 @@ def meeting_create(
     participants: list[str] | None = None,
 ) -> dict[str, Any]:
     """创建团队会议，用于多 Agent 协作讨论。
+
+    规则：根据议题动态添加合适参与者，讨论中发现新方向时随时招募专家。
+    讨论结论应转为任务放入任务墙。
 
     Args:
         team_id: 团队 ID 或名称
@@ -360,9 +363,8 @@ def task_run(
 ) -> dict[str, Any]:
     """在团队中创建一个任务，等待Agent领取执行。
 
-    自动检测与已有任务的相似度，若发现相似任务会在 related_tasks 字段中返回警告。
-    任务创建后状态为 pending，CC Agent 可通过 team_briefing 查看待办任务并领取。
-    如果指定了 depends_on，任务将标记为 blocked 直到所有依赖任务完成。
+    规则：设置priority(critical/high/medium/low)和horizon(short/mid/long)。
+    有依赖时设depends_on，系统自动管理BLOCKED状态。统筹并行推进，不等一个完成再开下一个。
 
     Args:
         team_id: 团队 ID 或名称
@@ -381,7 +383,8 @@ def task_run(
         payload["model"] = model
     if depends_on:
         payload["depends_on"] = depends_on
-    return _api_call("POST", f"/api/teams/{team_id}/tasks/run", payload)
+    result = _api_call("POST", f"/api/teams/{team_id}/tasks/run", payload)
+    return result
 
 
 # ============================================================
@@ -709,7 +712,8 @@ def team_setup_guide(project_type: str = "web-app") -> dict[str, Any]:
 def loop_start(team_id: str) -> dict[str, Any]:
     """启动公司循环 — Leader持续工作模式。
 
-    启动后，Leader可以通过loop_next_task持续获取下一个任务。
+    启动后循环领取最高优先级任务。每N个任务触发回顾讨论。
+    任务不足时应组织会议讨论方向，不能没事找事干。
 
     Args:
         team_id: 团队 ID 或名称
@@ -717,7 +721,8 @@ def loop_start(team_id: str) -> dict[str, Any]:
     Returns:
         循环状态信息，包含当前阶段和周期数
     """
-    return _api_call("POST", f"/api/teams/{team_id}/loop/start")
+    result = _api_call("POST", f"/api/teams/{team_id}/loop/start")
+    return result
 
 
 # ============================================================
@@ -747,7 +752,8 @@ def loop_status(team_id: str) -> dict[str, Any]:
 def loop_next_task(team_id: str, agent_id: str = "") -> dict[str, Any]:
     """获取下一个应执行的任务 — 按优先级×时间跨度×就绪度排序。
 
-    持续工作模式下，Leader每完成一个任务后调用此工具获取下一个。
+    优先领取pinned和critical任务。short优先于mid优先于long。
+    BLOCKED任务等依赖完成后自动解锁，无需手动处理。
 
     Args:
         team_id: 团队 ID 或名称
@@ -759,7 +765,8 @@ def loop_next_task(team_id: str, agent_id: str = "") -> dict[str, Any]:
     payload: dict[str, Any] = {}
     if agent_id:
         payload["agent_id"] = agent_id
-    return _api_call("POST", f"/api/teams/{team_id}/loop/next-task", payload)
+    result = _api_call("POST", f"/api/teams/{team_id}/loop/next-task", payload)
+    return result
 
 
 # ============================================================
