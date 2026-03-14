@@ -183,7 +183,14 @@ _ADVISORY_RULES: list[dict] = [
         "category": "leadership",
         "name": "任务墙灵活领取——不局限短期",
         "description": "Leader根据项目进度判断，可直接领取中/长期任务开始实施，不必只做短期",
-        "advice": "中长期任务拆分应由Leader基于项目上下文判断，或组织专项规划会议讨论。不要用模板机械拆分。可用task_decompose的自定义模式批量创建子任务。拆分后暂不实施的应撤回，避免僵尸任务",
+        "advice": "拆分应基于Leader判断或规划会议，不用模板。拆分后暂不实施的应撤回，避免僵尸任务",
+    },
+    {
+        "id": "B0.6",
+        "category": "leadership",
+        "name": "项目记忆维护——确保可恢复",
+        "description": "Leader负责记录和总结项目进度，确保compact/重启后能完整恢复项目上下文",
+        "advice": "每完成阶段性目标，更新memory文件记录：做了什么、决策原因、当前状态、下一步。维护任务墙+会议记录+memory文件的三方一致性",
     },
     {
         "id": "B1",
