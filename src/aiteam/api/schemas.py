@@ -53,6 +53,7 @@ class TeamUpdate(BaseModel):
     """更新团队请求."""
 
     mode: str | None = None
+    status: str | None = None
 
 
 class AgentCreate(BaseModel):

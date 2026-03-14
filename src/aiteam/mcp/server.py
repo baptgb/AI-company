@@ -827,6 +827,27 @@ def loop_resume(team_id: str) -> dict[str, Any]:
 
 
 # ============================================================
+# Tool: loop_review
+# ============================================================
+
+
+@mcp.tool()
+def loop_review(team_id: str) -> dict[str, Any]:
+    """触发公司循环回顾 — 自动创建回顾会议并生成统计报告。
+
+    回顾会议包含：本轮完成的任务汇总、失败任务分析、下一步建议。
+    Leader和团队可在会议中讨论并产出新的待办任务。
+
+    Args:
+        team_id: 团队 ID 或名称
+
+    Returns:
+        回顾会议信息，包含 meeting_id / stats / topic
+    """
+    return _api_call("POST", f"/api/teams/{team_id}/loop/review")
+
+
+# ============================================================
 # Tool 27: taskwall_view
 # ============================================================
 

@@ -121,6 +121,20 @@ async def resume_loop(
     }
 
 
+@router.post("/review")
+async def start_review(
+    team_id: str,
+    engine: LoopEngine = Depends(get_loop_engine),
+) -> dict[str, Any]:
+    """触发回顾会议，生成统计报告."""
+    review = await engine.start_review(team_id)
+    return {
+        "success": True,
+        "data": review,
+        "message": f"回顾会议已创建: {review['topic']}",
+    }
+
+
 @router.post("/watchdog/check")
 async def run_watchdog_check(
     team_id: str,

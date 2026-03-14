@@ -248,6 +248,101 @@ class LoopEngine:
         await self._save_state(state)
         return state
 
+    async def start_review(self, team_id: str) -> dict[str, Any]:
+        """触发回顾：创建回顾会议，生成统计报告."""
+        # 1. 获取本轮任务统计
+        all_tasks = await self._repo.list_tasks(team_id)
+        completed = [t for t in all_tasks if t.status == TaskStatus.COMPLETED]
+        failed = [t for t in all_tasks if t.status == TaskStatus.FAILED]
+        pending = [t for t in all_tasks if t.status == TaskStatus.PENDING]
+        running = [t for t in all_tasks if t.status == TaskStatus.RUNNING]
+        blocked = [t for t in all_tasks if t.status == TaskStatus.BLOCKED]
+
+        # 2. 获取 open issues
+        open_issues = [
+            t for t in all_tasks
+            if t.config.get("task_type") == "issue"
+            and t.status not in (TaskStatus.COMPLETED,)
+        ]
+
+        # 3. 生成议程文本
+        agenda_lines = [
+            "# 公司循环回顾报告",
+            "",
+            "## 任务统计",
+            f"- 总任务数: {len(all_tasks)}",
+            f"- 已完成: {len(completed)}",
+            f"- 失败: {len(failed)}",
+            f"- 进行中: {len(running)}",
+            f"- 待处理: {len(pending)}",
+            f"- 被阻塞: {len(blocked)}",
+            "",
+        ]
+
+        if completed:
+            agenda_lines.append("## 已完成的任务")
+            for t in completed:
+                agenda_lines.append(f"- [{t.priority}] {t.title or t.description[:60]}")
+            agenda_lines.append("")
+
+        if failed:
+            agenda_lines.append("## 失败的任务（需分析原因）")
+            for t in failed:
+                result_hint = ""
+                if t.result:
+                    result_hint = f" — {t.result[:80]}"
+                agenda_lines.append(f"- [{t.priority}] {t.title or t.description[:60]}{result_hint}")
+            agenda_lines.append("")
+
+        if open_issues:
+            agenda_lines.append("## 未解决的 Issue")
+            for t in open_issues:
+                severity = t.config.get("severity", "unknown")
+                category = t.config.get("category", "")
+                agenda_lines.append(f"- [{severity}/{category}] {t.title or t.description[:60]}")
+            agenda_lines.append("")
+
+        agenda_lines.extend([
+            "## 讨论议程",
+            "1. 本轮完成情况回顾",
+            "2. 失败任务原因分析与对策",
+            "3. 未解决 Issue 处理计划",
+            "4. 下一步工作建议",
+        ])
+
+        agenda_text = "\n".join(agenda_lines)
+
+        # 4. 创建回顾会议
+        state = await self.get_state(team_id)
+        topic = f"公司循环回顾 — 第 {state.current_cycle} 周期"
+        meeting = await self._repo.create_meeting(team_id, topic=topic, participants=[])
+
+        # 5. 发送统计报告作为第一条消息
+        await self._repo.create_meeting_message(
+            meeting_id=meeting.id,
+            agent_id="system",
+            agent_name="LoopEngine",
+            content=agenda_text,
+            round_number=1,
+        )
+
+        logger.info("Review started: team=%s, meeting=%s", team_id, meeting.id)
+
+        return {
+            "meeting_id": meeting.id,
+            "topic": topic,
+            "cycle": state.current_cycle,
+            "stats": {
+                "total": len(all_tasks),
+                "completed": len(completed),
+                "failed": len(failed),
+                "running": len(running),
+                "pending": len(pending),
+                "blocked": len(blocked),
+                "open_issues": len(open_issues),
+            },
+        }
+
     async def get_task_wall(
         self, team_id: str, horizon: str = "", priority: str = "",
     ) -> dict[str, Any]:

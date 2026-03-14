@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from aiteam.api.deps import get_event_bus, get_memory_store, get_repository
 from aiteam.api.event_bus import EventBus
@@ -120,6 +120,9 @@ async def create_meeting_message(
     if meeting is None:
         msg = f"会议 '{meeting_id}' 不存在"
         raise ValueError(msg)
+    # A14: 已结束会议禁止发消息
+    if meeting.status == MeetingStatus.CONCLUDED:
+        raise HTTPException(400, "会议已结束，无法发送消息")
     message = await repo.create_meeting_message(
         meeting_id=meeting_id,
         agent_id=body.agent_id,

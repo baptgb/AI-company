@@ -81,12 +81,30 @@ async def update_team(
     team_id: str,
     body: TeamUpdate,
     manager: TeamManager = Depends(get_manager),
+    repo: StorageRepository = Depends(get_repository),
 ) -> APIResponse[Team]:
-    """更新团队（设置编排模式）."""
+    """更新团队（设置编排模式/状态）."""
     if body.mode is not None:
         team = await manager.set_mode(team_id, body.mode)
     else:
         team = await manager.get_team(team_id)
+
+    # A13: 团队标记completed时自动将busy成员设为idle
+    if body.status == "completed":
+        from datetime import datetime
+
+        team = await repo.update_team(
+            team.id, status="completed", completed_at=datetime.now()
+        )
+        agents = await repo.list_agents(team.id)
+        for agent in agents:
+            if agent.status == AgentStatus.BUSY:
+                await repo.update_agent(
+                    agent.id, status="idle", current_task=None
+                )
+    elif body.status is not None:
+        team = await repo.update_team(team.id, status=body.status)
+
     return APIResponse(data=team, message="团队更新成功")
 
 
