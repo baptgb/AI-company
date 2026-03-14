@@ -67,7 +67,7 @@ async def get_project_task_wall(
             item = task.model_dump(mode="json")
             item["team_name"] = team_name_map.get(task.team_id, "")
 
-            if task.status == TaskStatus.COMPLETED:
+            if s == "completed":
                 completed_tasks.append(item)
                 continue
 
