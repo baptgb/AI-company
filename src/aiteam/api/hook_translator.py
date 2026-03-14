@@ -467,16 +467,29 @@ class HookTranslator:
                     )
                     logger.info("SessionStart: 创建项目Leader → team %s", team.name)
         else:
-            # 无项目匹配，fallback到旧逻辑
+            # 无项目匹配 → 自动创建项目（用cwd作为root_path）
+            if cwd:
+                import os
+                dir_name = os.path.basename(cwd.rstrip("/\\")) or "Project"
+                project = await self.repo.create_project(
+                    name=f"Project-{dir_name}",
+                    root_path=cwd.replace("\\", "/"),
+                )
+                logger.info("SessionStart: 自动创建项目 %s (root=%s)", project.name, cwd)
+            # 创建团队和Leader
             team = await self._find_or_create_session_team(session_id, payload)
             if team:
+                proj_id = project.id if project else None
+                if project and not team.project_id:
+                    await self.repo.update_team(team.id, project_id=proj_id)
                 leader = await self.repo.create_agent(
                     team_id=team.id,
-                    name=f"Leader-{session_id[:8]}",
+                    name="Leader",
                     role="leader",
-                    backstory="Session Leader (no project)",
+                    backstory="Project Leader",
                     source="hook",
                     session_id=session_id,
+                    project_id=proj_id,
                 )
                 await self.repo.update_agent(
                     leader.id, status="busy", last_active_at=datetime.now(),
