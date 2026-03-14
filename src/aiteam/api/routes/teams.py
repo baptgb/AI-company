@@ -180,7 +180,12 @@ async def team_briefing(
     if not agents:
         hints.append("团队暂无成员，请先添加agent")
 
-    # 7. 热点文件检测（被多个agent编辑的文件）
+    # 7. Leader规则提醒（每次briefing都提醒）
+    hints.append("[规则] 统筹并行推进，动态添加/Kill成员")
+    if not ready_tasks and not blocked_tasks:
+        hints.append("[规则] 任务不足时应组织会议讨论方向（loop_review），不能没事找事干")
+
+    # 8. 热点文件检测（被多个agent编辑的文件）
     file_hotspots = hook_translator.get_file_hotspots(window_minutes=10)
     if file_hotspots:
         hotspot_desc = ", ".join(
