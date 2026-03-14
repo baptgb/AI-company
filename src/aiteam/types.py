@@ -287,7 +287,7 @@ class TaskResult(BaseModel):
     duration_seconds: float = 0.0
 
 
-class TeamStatus(BaseModel):
+class TeamStatusSummary(BaseModel):
     """团队状态摘要."""
 
     team: Team

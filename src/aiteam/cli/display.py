@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from aiteam.types import Agent, Task, Team, TeamStatus
+from aiteam.types import Agent, Task, Team, TeamStatusSummary
 
 console = Console()
 
@@ -155,7 +155,7 @@ def print_tasks_table(tasks: list[Task]) -> None:
 # ============================================================
 
 
-def print_status(status: TeamStatus) -> None:
+def print_status(status: TeamStatusSummary) -> None:
     """综合状态面板."""
     # 团队信息
     team = status.team

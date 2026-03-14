@@ -21,7 +21,7 @@ from aiteam.types import (
     TaskResult,
     TaskStatus,
     Team,
-    TeamStatus,
+    TeamStatusSummary,
 )
 
 if TYPE_CHECKING:
@@ -445,14 +445,14 @@ class TeamManager:
         team = await self.get_team(team_name)
         return await self._repo.list_tasks(team.id)
 
-    async def get_status(self, team_name: str | None = None) -> TeamStatus:
+    async def get_status(self, team_name: str | None = None) -> TeamStatusSummary:
         """获取团队状态摘要.
 
         Args:
             team_name: 团队名称。如果为None，返回第一个团队的状态。
 
         Returns:
-            TeamStatus 团队状态摘要。
+            TeamStatusSummary 团队状态摘要。
 
         Raises:
             ValueError: 团队不存在时。
@@ -476,7 +476,7 @@ class TeamManager:
             1 for t in all_tasks if t.status == TaskStatus.COMPLETED
         )
 
-        return TeamStatus(
+        return TeamStatusSummary(
             team=team,
             agents=agents,
             active_tasks=active_tasks,

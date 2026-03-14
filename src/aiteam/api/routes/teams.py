@@ -15,7 +15,7 @@ from aiteam.api.schemas import (
 )
 from aiteam.orchestrator.team_manager import TeamManager
 from aiteam.storage.repository import StorageRepository
-from aiteam.types import AgentStatus, TaskStatus, Team, TeamStatus
+from aiteam.types import AgentStatus, TaskStatus, Team, TeamStatusSummary
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
@@ -99,11 +99,11 @@ async def delete_team(
     return APIResponse(data=result, message="团队删除成功")
 
 
-@router.get("/{team_id}/status", response_model=APIResponse[TeamStatus])
+@router.get("/{team_id}/status", response_model=APIResponse[TeamStatusSummary])
 async def get_status(
     team_id: str,
     manager: TeamManager = Depends(get_manager),
-) -> APIResponse[TeamStatus]:
+) -> APIResponse[TeamStatusSummary]:
     """获取团队状态摘要."""
     status = await manager.get_status(team_id)
     return APIResponse(data=status)
