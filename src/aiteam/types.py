@@ -64,6 +64,14 @@ class PhaseStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
+class TeamStatus(str, enum.Enum):
+    """团队生命周期状态."""
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ARCHIVED = "archived"
+
+
 class MemoryScope(str, enum.Enum):
     """记忆作用域."""
 
@@ -158,10 +166,13 @@ class Team(BaseModel):
     name: str
     mode: OrchestrationMode = OrchestrationMode.COORDINATE
     project_id: str | None = None
-    status: str = "active"
+    leader_agent_id: str | None = None  # 领导此团队的Leader agent
+    status: TeamStatus = TeamStatus.ACTIVE
+    summary: str = ""  # 团队完成后的一句话总结
     config: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+    completed_at: datetime | None = None
 
 
 class Agent(BaseModel):

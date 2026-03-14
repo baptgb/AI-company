@@ -242,13 +242,15 @@ class StorageRepository:
     # ================================================================
 
     async def create_team(
-        self, name: str, mode: str, config: dict | None = None
+        self, name: str, mode: str, config: dict | None = None, **kwargs: Any,
     ) -> Team:
         """创建团队."""
         team = Team(
             name=name,
             mode=OrchestrationMode(mode),
             config=config or {},
+            project_id=kwargs.get("project_id"),
+            leader_agent_id=kwargs.get("leader_agent_id"),
         )
         orm = TeamModel.from_pydantic(team)
         async with get_session(self._db_url) as session:
@@ -281,6 +283,30 @@ class StorageRepository:
             )
             rows = result.scalars().all()
             return [r.to_pydantic() for r in rows]
+
+    async def find_active_team_by_leader(self, leader_agent_id: str) -> Team | None:
+        """查找Leader当前领导的active团队."""
+        async with get_session(self._db_url) as session:
+            result = await session.execute(
+                select(TeamModel)
+                .where(TeamModel.leader_agent_id == leader_agent_id)
+                .where(TeamModel.status == "active")
+            )
+            row = result.scalar_one_or_none()
+            return row.to_pydantic() if row else None
+
+    async def find_leader_by_project(self, project_id: str) -> "Agent | None":
+        """查找项目的Leader agent（role=leader + project_id匹配）."""
+        async with get_session(self._db_url) as session:
+            result = await session.execute(
+                select(AgentModel)
+                .where(AgentModel.project_id == project_id)
+                .where(AgentModel.role == "leader")
+                .order_by(AgentModel.created_at.desc())
+                .limit(1)
+            )
+            row = result.scalar_one_or_none()
+            return row.to_pydantic() if row else None
 
     async def update_team(self, team_id: str, **kwargs: object) -> Team:
         """更新团队信息."""

@@ -45,6 +45,8 @@ class TeamCreate(BaseModel):
     name: str
     mode: str = "coordinate"
     config: dict[str, Any] = Field(default_factory=dict)
+    project_id: str | None = None
+    leader_agent_id: str | None = None
 
 
 class TeamUpdate(BaseModel):

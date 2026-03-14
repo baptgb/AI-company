@@ -74,8 +74,13 @@ class HookTranslator:
             )
             return {"status": "updated", "agent_id": existing.id}
 
-        # 未注册 -> 自动创建（兜底）
-        team = await self._find_or_create_session_team(session_id, payload)
+        # 未注册 -> 自动创建，归入Leader的active团队
+        leader = await self._find_leader(session_id)
+        team = None
+        if leader:
+            team = await self.repo.find_active_team_by_leader(leader.id)
+        if not team:
+            team = await self._find_or_create_session_team(session_id, payload)
         if team:
             agent = await self.repo.create_agent(
                 team_id=team.id,
@@ -401,37 +406,81 @@ class HookTranslator:
     async def _on_session_start(self, payload: dict) -> dict:
         """记录CC会话启动.
 
-        自动为session注册leader agent，确保后续工具事件能正确关联。
+        Leader = 用户打开的CC session。每个session对应一个Leader。
+        流程：
+        1. 通过cwd找项目
+        2. 查找项目中已有的Leader（role=leader + project_id匹配）
+        3. 有 → 复用，更新session_id+status=busy
+        4. 没有 → 创建新Leader
+        不再每次创建session-xxx幽灵agent。
         """
         session_id = payload.get("session_id", "")
         cwd = payload.get("cwd", "")
-
-        # 查找是否已有此session的agent
-        existing = await self.repo.find_agents_by_session(session_id)
         leader = None
 
-        if not existing:
-            # 新session → 在最近的团队中注册一个leader agent
+        # 1. 通过cwd找项目
+        project = None
+        projects = await self.repo.list_projects()
+        for proj in projects:
+            if proj.root_path and cwd.replace("\\", "/").startswith(proj.root_path.replace("\\", "/")):
+                project = proj
+                break
+
+        # 2. 查找此session是否已有Leader
+        existing = await self.repo.find_agents_by_session(session_id)
+        leaders_in_session = [a for a in existing if a.role == "leader"]
+
+        if leaders_in_session:
+            # 复用已有的session Leader
+            leader = leaders_in_session[0]
+            await self.repo.update_agent(
+                leader.id, status="busy", last_active_at=datetime.now(),
+            )
+        elif project:
+            # 3. 查找项目中已有的Leader（可能session_id为空的旧Leader）
+            project_leader = await self.repo.find_leader_by_project(project.id)
+            if project_leader:
+                # 复用项目Leader，绑定新session
+                leader = project_leader
+                await self.repo.update_agent(
+                    leader.id,
+                    session_id=session_id,
+                    status="busy",
+                    last_active_at=datetime.now(),
+                )
+                logger.info("SessionStart: 复用项目Leader %s (session=%s)", leader.name, session_id[:8])
+            else:
+                # 4. 项目无Leader → 创建
+                team = await self._find_or_create_session_team(session_id, payload)
+                if team:
+                    leader = await self.repo.create_agent(
+                        team_id=team.id,
+                        name="Leader",
+                        role="leader",
+                        backstory="Project Leader",
+                        source="hook",
+                        session_id=session_id,
+                        project_id=project.id,
+                    )
+                    await self.repo.update_agent(
+                        leader.id, status="busy", last_active_at=datetime.now(),
+                    )
+                    logger.info("SessionStart: 创建项目Leader → team %s", team.name)
+        else:
+            # 无项目匹配，fallback到旧逻辑
             team = await self._find_or_create_session_team(session_id, payload)
             if team:
                 leader = await self.repo.create_agent(
                     team_id=team.id,
-                    name=f"session-{session_id[:8]}",
+                    name=f"Leader-{session_id[:8]}",
                     role="leader",
-                    backstory=f"Auto-registered leader for session {session_id[:8]}",
+                    backstory="Session Leader (no project)",
                     source="hook",
                     session_id=session_id,
                 )
                 await self.repo.update_agent(
                     leader.id, status="busy", last_active_at=datetime.now(),
                 )
-                logger.info("SessionStart: 自动注册leader %s → team %s", leader.name, team.name)
-        else:
-            # 已有agent → 更新session关联和状态
-            leader = existing[0]
-            await self.repo.update_agent(
-                leader.id, status="busy", last_active_at=datetime.now(),
-            )
 
         await self.event_bus.emit(
             "cc.session_start",

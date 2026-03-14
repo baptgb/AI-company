@@ -33,11 +33,35 @@ async def list_teams(
 async def create_team(
     body: TeamCreate,
     manager: TeamManager = Depends(get_manager),
+    repo: StorageRepository = Depends(get_repository),
 ) -> APIResponse[Team]:
-    """创建团队."""
+    """创建团队.
+
+    如果指定了leader_agent_id，自动完成该Leader的旧active团队。
+    """
+    # 自动完成Leader的旧active团队
+    if body.leader_agent_id:
+        old_team = await repo.find_active_team_by_leader(body.leader_agent_id)
+        if old_team:
+            from datetime import datetime
+            await repo.update_team(
+                old_team.id,
+                status="completed",
+                completed_at=datetime.now(),
+            )
+
     team = await manager.create_team(
         name=body.name, mode=body.mode, config=body.config
     )
+    # 设置project_id和leader关联
+    updates: dict = {}
+    if body.project_id:
+        updates["project_id"] = body.project_id
+    if body.leader_agent_id:
+        updates["leader_agent_id"] = body.leader_agent_id
+    if updates:
+        team = await repo.update_team(team.id, **updates)
+
     return APIResponse(data=team, message="团队创建成功")
 
 

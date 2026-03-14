@@ -81,17 +81,32 @@ def _api_call(method: str, path: str, data: dict[str, Any] | None = None) -> dic
 
 
 @mcp.tool()
-def team_create(name: str, mode: str = "coordinate") -> dict[str, Any]:
+def team_create(
+    name: str,
+    mode: str = "coordinate",
+    project_id: str = "",
+    leader_agent_id: str = "",
+) -> dict[str, Any]:
     """创建一个新的 AI Agent 团队。
+
+    如果指定了 leader_agent_id，会自动完成该 Leader 的旧 active 团队。
+    一个 Leader 同时只能领导一个 active 团队。
 
     Args:
         name: 团队名称
         mode: 协作模式，可选 "coordinate"（协调）或 "broadcast"（广播）
+        project_id: 关联的项目 ID（可选）
+        leader_agent_id: 领导此团队的 Leader agent ID（可选，用于自动完成旧团队）
 
     Returns:
         创建的团队信息，包含 team_id
     """
-    result = _api_call("POST", "/api/teams", {"name": name, "mode": mode})
+    payload: dict[str, Any] = {"name": name, "mode": mode}
+    if project_id:
+        payload["project_id"] = project_id
+    if leader_agent_id:
+        payload["leader_agent_id"] = leader_agent_id
+    result = _api_call("POST", "/api/teams", payload)
     result["_role_suggestions"] = {
         "hint": "建议为团队配置以下角色以提升协作效率：",
         "roles": [

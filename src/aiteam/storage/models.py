@@ -141,22 +141,29 @@ class TeamModel(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     mode: Mapped[str] = mapped_column(String(20), nullable=False, default="coordinate")
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    leader_agent_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
+    summary: Mapped[str] = mapped_column(String(500), default="")
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def to_pydantic(self) -> Team:
         """转换为 Pydantic 模型."""
+        from aiteam.types import TeamStatus
         return Team(
             id=self.id,
             name=self.name,
             mode=OrchestrationMode(self.mode),
             project_id=self.project_id,
-            status=self.status or "active",
+            leader_agent_id=self.leader_agent_id,
+            status=TeamStatus(self.status) if self.status else TeamStatus.ACTIVE,
+            summary=self.summary or "",
             config=self.config or {},
             created_at=self.created_at,
             updated_at=self.updated_at,
+            completed_at=self.completed_at,
         )
 
     @staticmethod
@@ -167,10 +174,13 @@ class TeamModel(Base):
             name=team.name,
             mode=team.mode.value,
             project_id=team.project_id,
-            status=team.status,
+            leader_agent_id=team.leader_agent_id,
+            status=team.status.value if hasattr(team.status, "value") else str(team.status),
+            summary=team.summary,
             config=team.config,
             created_at=team.created_at,
             updated_at=team.updated_at,
+            completed_at=team.completed_at,
         )
 
 
