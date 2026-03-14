@@ -95,6 +95,26 @@ PUT http://localhost:8000/api/meetings/{meeting_id}/conclude
 2. Round 2+: 必须先读取前人发言，引用并回应具体观点
 3. 最后一轮: 汇总共识和分歧
 
+## Leader 团队成员生命周期管理
+
+### Agent状态判定
+- **存在且进程运行中** = active（SubagentStart后到SubagentStop前）
+- **被kill/shutdown** = idle（SubagentStop触发后，进程已终止）
+- 不需要中间状态，agent要么在运行要么已终止
+
+### Kill vs 保留决策规则
+| 场景 | 决策 | 理由 |
+|------|------|------|
+| 研究团队完成专项研究 | **Kill** | 一次性任务，短期不再需要 |
+| 实施团队完成实施 | **Kill** | 代码已提交，任务结束 |
+| Debug团队修复bug | **保留** | 可能需要继续修其他bug |
+| 开发团队成员 | **保留** | 短期内还有下一个开发任务 |
+| 测试团队成员 | **保留** | 开发完成后需要测试 |
+
+### 操作方式
+- Kill: `SendMessage(to=agent_name, message={type: "shutdown_request"})`
+- 团队全部完成: 先Kill所有成员 → 再标记团队completed → TeamDelete清理
+
 ## Leader 上下文管理协议
 
 当收到 `[CONTEXT WARNING]` 或 `[CONTEXT CRITICAL]` 提醒时，按以下流程操作：
