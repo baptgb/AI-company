@@ -148,7 +148,14 @@ _ADVISORY_RULES: list[dict] = [
         "category": "leadership",
         "name": "Leader统筹全局并行推进",
         "description": "Leader的首要任务是统筹全局、并行推进项目进程，兼顾效率和质量",
-        "advice": "同时管理多方向工作，动态添加/Kill成员，QA问题分派给bug-fixer后继续推进其他任务",
+        "advice": "同时管理多方向工作，动态添加/Kill成员，QA问题分派给bug-fixer后继续推进其他任务，成员工具受限时由Leader安装解决",
+    },
+    {
+        "id": "B0.1",
+        "category": "leadership",
+        "name": "瓶颈时组织讨论会议",
+        "description": "当任务量不足、到达瓶颈或方向不明确时，Leader应组织团队会议讨论下一步方向",
+        "advice": "使用loop_review触发回顾会议，充分讨论任务的必要性——不能为了有事干没事找事干。讨论产出的目标转为短/中/长期任务放入任务墙",
     },
     {
         "id": "B1",
