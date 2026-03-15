@@ -163,6 +163,9 @@ class HookTranslator:
 
         # 查找是否已注册（优先session+name，再按团队内name去重）
         existing = await self.repo.find_agent_by_session(session_id, agent_name)
+        leader = None
+        team = None
+
         if not existing:
             # 按团队内同名agent查找（MCP注册的agent session_id可能为空）
             leader = await self._find_leader(session_id)
@@ -193,11 +196,51 @@ class HookTranslator:
             )
             return {"status": "updated", "agent_id": existing.id}
 
-        # 未注册 → 不创建，只记录事件。创建权交给MCP os-register skill。
-        # 这避免了hook和MCP同时创建导致的重复agent问题。
-        logger.info("SubagentStart: agent '%s' 未注册，跳过自动创建（等待MCP注册）", agent_name)
+        # 未注册 → 自动创建到Leader的active团队
+        # CC Agent(team_name=...)创建的成员通过此路径自动注册到OS
+        if not leader:
+            leader = await self._find_leader(session_id)
+        if leader and not team:
+            team = await self.repo.find_active_team_by_leader(leader.id)
 
-        return {"status": "skipped", "reason": "no team context"}
+        if not team:
+            logger.info(
+                "SubagentStart: agent '%s' 未注册且无法找到active团队，跳过",
+                agent_name,
+            )
+            return {"status": "skipped", "reason": "no active team"}
+
+        new_agent = await self.repo.create_agent(
+            team_id=team.id,
+            name=agent_name,
+            role="CC团队成员 (auto-registered)",
+            source="hook",
+            session_id=session_id,
+            cc_tool_use_id=cc_agent_id,
+        )
+        # create_agent默认status=idle，立即设为busy
+        await self.repo.update_agent(
+            new_agent.id,
+            status="busy",
+            project_id=team.project_id,
+            last_active_at=datetime.now(),
+        )
+
+        await self.event_bus.emit(
+            "agent.status_changed",
+            f"agent:{new_agent.id}",
+            {
+                "agent_id": new_agent.id,
+                "name": agent_name,
+                "status": "busy",
+                "trigger": "hook_auto_register",
+            },
+        )
+        logger.info(
+            "SubagentStart: 自动注册 agent '%s' → team '%s' (cc_id=%s)",
+            agent_name, team.name, cc_agent_id[:8] if cc_agent_id else "?",
+        )
+        return {"status": "created", "agent_id": new_agent.id}
 
     async def _on_subagent_stop(self, payload: dict) -> dict:
         """处理子Agent停止事件.
