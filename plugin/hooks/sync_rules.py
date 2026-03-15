@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""AI Team OS — CLAUDE.md 规则段同步脚本
+"""AI Team OS — CLAUDE.md 规则段同步脚本 [DEPRECATED]
 
-自动在项目的 CLAUDE.md 中维护 AI Team OS 规则段。
-使用标记注释 <!-- AI-TEAM-OS-RULES-START/END --> 保护用户自有内容。
+⚠️ 此脚本已废弃。规则现在通过 session_bootstrap.py 在 SessionStart hook
+中以 stdout 方式注入到 Claude 上下文，不再需要写入用户的 CLAUDE.md 文件。
 
-用法:
+保留此文件仅用于向后兼容。如需手动同步规则到 CLAUDE.md，仍可直接运行：
     python plugin/hooks/sync_rules.py [claude_md_path]
 
-如果不传路径，默认操作当前目录下的 CLAUDE.md。
+但推荐方式是依赖 SessionStart hook 自动注入规则。
 只使用 Python 标准库。
 """
 

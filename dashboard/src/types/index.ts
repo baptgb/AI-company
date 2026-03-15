@@ -26,6 +26,7 @@ export interface Agent {
   session_id?: string | null;     // CC会话ID
   cc_tool_use_id?: string | null; // CC内部agent ID
   current_task?: string | null;   // 当前正在执行的任务描述
+  last_active_at?: string | null; // 最后活跃时间
 }
 
 export interface Task {

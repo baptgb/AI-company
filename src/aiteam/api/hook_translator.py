@@ -205,12 +205,13 @@ class HookTranslator:
         CC SubagentStop payload包含 agent_id 用于精确匹配。
         """
         cc_agent_id = payload.get("agent_id", "")
+        agent_name = payload.get("agent_type", "")
         session_id = payload.get("session_id", "")
 
         updated: list[str] = []
         if cc_agent_id:
-            # 精确匹配CC agent ID
-            agent = await self.repo.find_agent_by_cc_id(cc_agent_id)
+            # 通过_resolve_agent统一查找（支持late binding回退）
+            agent = await self._resolve_agent(cc_agent_id, agent_name, session_id)
             if agent and agent.status == "busy":
                 await self.repo.update_agent(
                     agent.id, status="idle", current_task=None,
@@ -425,6 +426,52 @@ class HookTranslator:
         """获取某agent近期正在编辑的文件 — 供agent注册时告知."""
         return self._file_tracker.get_agent_files(agent_id)
 
+    async def _resolve_agent(
+        self, cc_agent_id: str, agent_name: str, session_id: str,
+    ) -> object | None:
+        """解析工具调用所属的agent — 支持cc_id精确匹配+name回退.
+
+        CC team agent存在race condition：SubagentStart可能在MCP注册前触发，
+        导致cc_tool_use_id未绑定。此方法在cc_id查找失败时，按name在团队内
+        回退匹配，并补绑cc_tool_use_id（late binding），修复后续所有查找。
+        """
+        # 1. 优先：通过cc_tool_use_id精确匹配
+        if cc_agent_id:
+            agent = await self.repo.find_agent_by_cc_id(cc_agent_id)
+            if agent:
+                return agent
+
+        # 2. 回退：cc_agent_id存在但未绑定（race condition），按name在团队内查找
+        if cc_agent_id and agent_name:
+            leader = await self._find_leader(session_id)
+            if leader:
+                team = await self.repo.find_active_team_by_leader(leader.id)
+                if team:
+                    team_agents = await self.repo.list_agents(team.id)
+                    matches = [
+                        a for a in team_agents
+                        if a.name == agent_name and a.id != leader.id
+                    ]
+                    if matches:
+                        agent = matches[0]
+                        # Late binding：补绑cc_tool_use_id，修复后续所有查找
+                        await self.repo.update_agent(
+                            agent.id,
+                            cc_tool_use_id=cc_agent_id,
+                            session_id=session_id,
+                        )
+                        logger.info(
+                            "Late binding: agent '%s' 绑定 cc_id=%s",
+                            agent_name, cc_agent_id[:8],
+                        )
+                        return agent
+
+        # 3. 无agent_id → 主session的工具调用（Leader）
+        if not cc_agent_id:
+            return await self._find_leader(session_id)
+
+        return None
+
     async def _on_pre_tool_use(self, payload: dict) -> dict:
         """记录工具使用事件.
 
@@ -436,6 +483,7 @@ class HookTranslator:
         tool_name = payload.get("tool_name", "unknown")
         session_id = payload.get("session_id", "")
         cc_agent_id = payload.get("agent_id", "")
+        agent_name = payload.get("agent_type", "")
         tool_input = payload.get("tool_input", {})
 
         # 提取输入摘要 — 文件编辑工具优先存储file_path以支持冲突检测
@@ -460,13 +508,8 @@ class HookTranslator:
         elif isinstance(tool_input, str):
             input_summary = tool_input[:200]
 
-        # 通过CC agent_id精确关联到子代理
-        target_agent = None
-        if cc_agent_id:
-            target_agent = await self.repo.find_agent_by_cc_id(cc_agent_id)
-        else:
-            # 没有agent_id → 主session的工具调用（Tech Lead）
-            target_agent = await self._find_leader(session_id)
+        # 解析工具调用所属的agent（支持cc_id精确匹配+name回退）
+        target_agent = await self._resolve_agent(cc_agent_id, agent_name, session_id)
 
         if target_agent:
             # 自愈：IDLE agent收到工具事件 → 修正为BUSY
@@ -550,13 +593,9 @@ class HookTranslator:
         elif isinstance(tool_response, str):
             output_summary = tool_response[:500]
 
-        # 通过CC agent_id精确关联
-        target_agent = None
-        if cc_agent_id:
-            target_agent = await self.repo.find_agent_by_cc_id(cc_agent_id)
-        else:
-            # 主session的工具调用 → 关联Tech Lead
-            target_agent = await self._find_leader(session_id)
+        # 解析工具调用所属的agent（支持cc_id精确匹配+name回退）
+        agent_name = payload.get("agent_type", "")
+        target_agent = await self._resolve_agent(cc_agent_id, agent_name, session_id)
 
         if target_agent:
             # 自愈：IDLE agent收到工具完成事件 → 修正为BUSY

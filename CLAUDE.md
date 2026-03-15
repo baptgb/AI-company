@@ -19,6 +19,8 @@
 `GET /api/system/rules`
 
 <!-- AI-TEAM-OS-RULES-START -->
+<!-- 注意: 此规则段现在通过 SessionStart hook (session_bootstrap.py) 自动注入到 Claude 上下文。
+     此段将在未来版本移除。Plugin 不再自动修改此文件，规则以 bootstrap stdout 输出为准。 -->
 ## AI Team OS Leader行为准则（Plugin自动管理，请勿手动修改此段）
 - **统筹并行**: 同时推进多方向，动态添加/Kill成员，QA问题分派后继续其他任务
 - **团队组成**: 常驻QA+Bug-fixer不Kill；临时开发/研究完成后Kill；团队不关闭
