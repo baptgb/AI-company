@@ -156,18 +156,31 @@ class HookTranslator:
         - agent_type: Agent名称（来自Agent tool的name参数）
         - agent_id: CC内部agent ID（用于关联后续工具调用）
         - session_id: 父session ID
+
+        去重策略（4级查找链）：
+        1. cc_tool_use_id精确匹配（最快，覆盖重复SubagentStart）
+        2. session_id + name匹配
+        3. 团队内同名agent匹配（覆盖MCP预注册的情况）
+        4. 以上都没找到 → 创建前再做name去重防并发
         """
         cc_agent_id = payload.get("agent_id", "")
         agent_name = payload.get("agent_type", "unnamed-agent")
         session_id = payload.get("session_id", "")
 
-        # 查找是否已注册（优先session+name，再按团队内name去重）
-        existing = await self.repo.find_agent_by_session(session_id, agent_name)
+        existing = None
         leader = None
         team = None
 
+        # 1. cc_tool_use_id精确匹配（最快，覆盖重复SubagentStart事件）
+        if cc_agent_id:
+            existing = await self.repo.find_agent_by_cc_id(cc_agent_id)
+
+        # 2. session_id + name匹配
         if not existing:
-            # 按团队内同名agent查找（MCP注册的agent session_id可能为空）
+            existing = await self.repo.find_agent_by_session(session_id, agent_name)
+
+        # 3. 团队内同名agent匹配（覆盖MCP预注册、session_id为空等情况）
+        if not existing:
             leader = await self._find_leader(session_id)
             if leader:
                 team = await self.repo.find_active_team_by_leader(leader.id)
@@ -196,8 +209,7 @@ class HookTranslator:
             )
             return {"status": "updated", "agent_id": existing.id}
 
-        # 未注册 → 自动创建到Leader的active团队
-        # CC Agent(team_name=...)创建的成员通过此路径自动注册到OS
+        # 4. 未注册 → 自动创建到Leader的active团队
         if not leader:
             leader = await self._find_leader(session_id)
         if leader and not team:
@@ -209,6 +221,22 @@ class HookTranslator:
                 agent_name,
             )
             return {"status": "skipped", "reason": "no active team"}
+
+        # 创建前最终name去重（防并发：MCP可能在查找链执行期间完成注册）
+        team_agents = await self.repo.list_agents(team.id)
+        late_match = [a for a in team_agents if a.name == agent_name]
+        if late_match:
+            existing = late_match[0]
+            await self.repo.update_agent(
+                existing.id, status="busy", cc_tool_use_id=cc_agent_id,
+                session_id=session_id,
+                last_active_at=datetime.now(),
+            )
+            logger.info(
+                "SubagentStart: 并发去重命中 agent '%s' (id=%s)",
+                agent_name, existing.id,
+            )
+            return {"status": "updated", "agent_id": existing.id}
 
         new_agent = await self.repo.create_agent(
             team_id=team.id,

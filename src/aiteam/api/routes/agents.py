@@ -40,17 +40,40 @@ async def add_agent(
     manager: TeamManager = Depends(get_manager),
     repo: StorageRepository = Depends(get_repository),
 ) -> dict[str, Any]:
-    """向团队添加Agent，返回agent信息和团队快照."""
-    agent = await manager.add_agent(
-        team_name=team_id,
-        name=body.name,
-        role=body.role,
-        system_prompt=body.system_prompt,
-        model=body.model,
-    )
+    """向团队添加Agent，返回agent信息和团队快照.
 
-    # 注册即工作 — 默认设为busy
-    await repo.update_agent(agent.id, status="busy", last_active_at=datetime.now())
+    去重：同一团队内不允许同名agent。如果已存在同名agent，
+    更新其信息并返回（覆盖hook自动注册的占位数据）。
+    """
+    team = await manager.get_team(team_id)
+    existing_agents = await repo.list_agents(team.id)
+    existing = next((a for a in existing_agents if a.name == body.name), None)
+
+    if existing:
+        # 同名agent已存在（可能由hook自动注册）→ 更新而非重复创建
+        update_fields: dict[str, object] = {
+            "status": "busy",
+            "last_active_at": datetime.now(),
+        }
+        if body.role:
+            update_fields["role"] = body.role
+        if body.system_prompt:
+            update_fields["system_prompt"] = body.system_prompt
+        if body.model:
+            update_fields["model"] = body.model
+        # 标记为api来源（MCP注册优先级高于hook自动注册）
+        update_fields["source"] = "api"
+        agent = await repo.update_agent(existing.id, **update_fields)
+    else:
+        agent = await manager.add_agent(
+            team_name=team_id,
+            name=body.name,
+            role=body.role,
+            system_prompt=body.system_prompt,
+            model=body.model,
+        )
+        # 注册即工作 — 默认设为busy
+        await repo.update_agent(agent.id, status="busy", last_active_at=datetime.now())
 
     # 获取团队快照：当前所有agent、待办任务和最近会议
     team = await manager.get_team(team_id)
