@@ -11,6 +11,7 @@ import { EventsPage } from '@/pages/EventsPage';
 import { MeetingsPage } from '@/pages/MeetingsPage';
 import { MeetingDetailPage } from '@/pages/MeetingDetailPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { AnalyticsPage } from '@/pages/AnalyticsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +37,7 @@ export default function App() {
                 <Route path="events" element={<EventsPage />} />
                 <Route path="meetings" element={<MeetingsPage />} />
                 <Route path="meetings/:meetingId" element={<MeetingDetailPage />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Routes>

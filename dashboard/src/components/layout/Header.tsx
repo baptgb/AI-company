@@ -8,6 +8,7 @@ const pageTitles: Record<string, string> = {
   '/tasks': '任务看板',
   '/events': '事件日志',
   '/meetings': '会议室',
+  '/analytics': '活动分析',
   '/settings': '设置',
 };
 

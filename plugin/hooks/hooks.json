@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File plugin/hooks/context-monitor.ps1",
+            "command": "python plugin/hooks/context_monitor.py",
             "timeout": 3000
           }
         ]
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File plugin/hooks/pre-compact-save.ps1",
+            "command": "python plugin/hooks/pre_compact_save.py",
             "timeout": 5000
           }
         ]

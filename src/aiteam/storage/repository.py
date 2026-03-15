@@ -977,3 +977,106 @@ class StorageRepository:
             result = await session.execute(stmt)
             rows = result.scalars().all()
             return [r.to_pydantic() for r in rows]
+
+    # ================================================================
+    # Analytics — 聚合统计查询
+    # ================================================================
+
+    async def count_activities_by_tool(
+        self,
+        agent_id: str | None = None,
+        team_id: str | None = None,
+    ) -> list[dict]:
+        """按工具名称统计活动次数."""
+        async with get_session(self._db_url) as session:
+            stmt = (
+                select(
+                    AgentActivityModel.tool_name,
+                    func.count().label("count"),
+                )
+                .group_by(AgentActivityModel.tool_name)
+                .order_by(func.count().desc())
+            )
+            if agent_id is not None:
+                stmt = stmt.where(AgentActivityModel.agent_id == agent_id)
+            if team_id is not None:
+                # 通过agent表关联筛选team
+                stmt = stmt.join(
+                    AgentModel,
+                    AgentActivityModel.agent_id == AgentModel.id,
+                ).where(AgentModel.team_id == team_id)
+
+            result = await session.execute(stmt)
+            return [
+                {"tool_name": row.tool_name, "count": row.count}
+                for row in result.all()
+            ]
+
+    async def get_activity_timeline(
+        self,
+        team_id: str | None = None,
+        hours: int = 24,
+    ) -> list[dict]:
+        """按小时统计活动数量（最近 N 小时）."""
+        cutoff = datetime.now() - timedelta(hours=hours)
+        async with get_session(self._db_url) as session:
+            # 使用 strftime 提取小时粒度（SQLite 兼容）
+            hour_expr = func.strftime("%Y-%m-%d %H:00", AgentActivityModel.timestamp)
+            stmt = (
+                select(
+                    hour_expr.label("hour"),
+                    func.count().label("count"),
+                )
+                .where(AgentActivityModel.timestamp >= cutoff)
+                .group_by(hour_expr)
+                .order_by(hour_expr)
+            )
+            if team_id is not None:
+                stmt = stmt.join(
+                    AgentModel,
+                    AgentActivityModel.agent_id == AgentModel.id,
+                ).where(AgentModel.team_id == team_id)
+
+            result = await session.execute(stmt)
+            return [
+                {"hour": row.hour, "count": row.count}
+                for row in result.all()
+            ]
+
+    async def get_agent_productivity(
+        self,
+        team_id: str | None = None,
+    ) -> list[dict]:
+        """每个Agent的产能指标：活动次数、工具多样性、最后活跃时间."""
+        async with get_session(self._db_url) as session:
+            stmt = (
+                select(
+                    AgentActivityModel.agent_id,
+                    func.count().label("activity_count"),
+                    func.count(AgentActivityModel.tool_name.distinct()).label("tools_used"),
+                    func.max(AgentActivityModel.timestamp).label("last_active"),
+                )
+                .group_by(AgentActivityModel.agent_id)
+                .order_by(func.count().desc())
+            )
+            if team_id is not None:
+                stmt = stmt.join(
+                    AgentModel,
+                    AgentActivityModel.agent_id == AgentModel.id,
+                ).where(AgentModel.team_id == team_id)
+
+            result = await session.execute(stmt)
+            rows = result.all()
+
+            # 补充 agent 名称
+            output: list[dict] = []
+            for row in rows:
+                agent = await self.get_agent(row.agent_id)
+                output.append({
+                    "agent_id": row.agent_id,
+                    "agent_name": agent.name if agent else "unknown",
+                    "activity_count": row.activity_count,
+                    "tools_used": row.tools_used,
+                    "last_active": row.last_active.isoformat() if row.last_active else None,
+                })
+            return output

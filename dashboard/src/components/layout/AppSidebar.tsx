@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Settings,
   Bot,
+  BarChart3,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -29,6 +30,7 @@ const navItems = [
   { title: '任务看板', path: '/tasks', icon: ListTodo },
   { title: '事件日志', path: '/events', icon: Activity },
   { title: '会议室', path: '/meetings', icon: MessageSquare },
+  { title: '活动分析', path: '/analytics', icon: BarChart3 },
   { title: '设置', path: '/settings', icon: Settings },
 ];
 
