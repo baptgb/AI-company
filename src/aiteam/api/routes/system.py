@@ -207,6 +207,13 @@ _ADVISORY_RULES: list[dict] = [
         "advice": "判断标准：这个改动会影响系统行为或前端显示吗？是→同步QA。否（如文档编写、规则更新）→不需要",
     },
     {
+        "id": "B0.9",
+        "category": "leadership",
+        "name": "Leader专注统筹，不做具体实施",
+        "description": "Leader的核心职责是任务分配、决策、推进项目进度。除非是极快完成的小改动（<2分钟），否则必须分配给团队成员执行。Leader陷入具体实施会导致项目整体停滞",
+        "advice": "判断标准：这个任务需要读多个文件、写代码、调试吗？是→创建团队成员分配。否（如改一行配置、加一条规则）→Leader直接做",
+    },
+    {
         "id": "B1",
         "category": "coordination",
         "name": "文件驱动协调",
