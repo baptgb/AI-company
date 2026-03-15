@@ -8,9 +8,11 @@ CC hook触发时执行此脚本，将事件转发到OS API。
 因为它可能在任何Python环境中被CC直接调用。
 """
 
+import glob
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -21,7 +23,7 @@ MAX_FIELD_LEN = 500
 MAX_PAYLOAD_BYTES = 32_768  # 整体payload上限32KB，超过则丢弃非必要字段
 LARGE_FIELDS = {"last_assistant_message", "agent_transcript_path", "transcript_path"}
 # 必须保留的字段（即使payload超限也不丢弃）
-ESSENTIAL_FIELDS = {"hook_event_name", "session_id", "tool_name", "tool_input"}
+ESSENTIAL_FIELDS = {"hook_event_name", "session_id", "tool_name", "tool_input", "cc_team_name"}
 
 
 def _trim_payload(payload: dict) -> dict:
@@ -62,6 +64,33 @@ def _trim_payload(payload: dict) -> dict:
     return trimmed
 
 
+def _resolve_cc_team_name(session_id: str) -> str | None:
+    """通过session_id在CC团队配置中查找所属团队名称。
+
+    扫描 ~/.claude/teams/*/config.json，找到 leadSessionId 匹配的团队。
+    只使用标准库，静默处理所有异常。
+    """
+    if not session_id:
+        return None
+    teams_dir = os.path.join(os.path.expanduser("~"), ".claude", "teams")
+    try:
+        config_files = glob.glob(os.path.join(teams_dir, "*", "config.json"))
+    except OSError:
+        return None
+
+    for config_path in config_files:
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+            # leadSessionId匹配 → 当前session就是这个团队的leader session
+            if config.get("leadSessionId") == session_id:
+                return config.get("name")
+            # 也检查成员列表中的agentId是否包含session信息（备用）
+        except (json.JSONDecodeError, OSError, KeyError):
+            continue
+    return None
+
+
 def _check_agent_team_name(event_data: dict) -> str | None:
     """检查Agent工具调用是否带team_name。返回warning文本或None。"""
     tool_name = event_data.get("tool_name", "")
@@ -97,6 +126,125 @@ def _check_agent_team_name(event_data: dict) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Supervisor state 文件路径（固定位置）
+# ---------------------------------------------------------------------------
+_SUPERVISOR_STATE_DIR = os.path.join(
+    os.path.expanduser("~"), ".claude", "data", "ai-team-os"
+)
+_SUPERVISOR_STATE_FILE = os.path.join(_SUPERVISOR_STATE_DIR, "supervisor-state.json")
+
+# Leader委派检查的阈值
+_LEADER_CONSECUTIVE_THRESHOLD = 8
+
+# TeamCreate后等待Agent调用的阈值
+_TEAM_WITHOUT_MEMBERS_THRESHOLD = 3
+
+# 视为"委派"动作的工具名（调用这些工具会重置计数器）
+_DELEGATION_TOOLS = {"Agent", "TeamCreate", "SendMessage"}
+
+
+def _load_supervisor_state() -> dict:
+    """加载supervisor状态文件，不存在或损坏时返回默认值。"""
+    try:
+        with open(_SUPERVISOR_STATE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_supervisor_state(state: dict) -> None:
+    """保存supervisor状态到文件。"""
+    try:
+        os.makedirs(_SUPERVISOR_STATE_DIR, exist_ok=True)
+        with open(_SUPERVISOR_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+    except OSError:
+        pass  # 静默失败，不影响正常工具调用
+
+
+def _check_leader_doing_too_much(event_data: dict) -> str | None:
+    """检查Leader是否连续执行过多工具调用而未委派。
+
+    当连续非委派工具调用次数超过阈值时返回warning文本。
+    当Leader调用Agent/TeamCreate/SendMessage时重置计数器。
+    """
+    tool_name = event_data.get("tool_name", "")
+    if not tool_name:
+        return None
+
+    state = _load_supervisor_state()
+    consecutive = state.get("leader_consecutive_calls", 0)
+
+    if tool_name in _DELEGATION_TOOLS:
+        # 委派动作，重置计数器
+        state["leader_consecutive_calls"] = 0
+        _save_supervisor_state(state)
+        return None
+
+    # 非委派工具调用，递增计数器
+    consecutive += 1
+    state["leader_consecutive_calls"] = consecutive
+    _save_supervisor_state(state)
+
+    if consecutive > _LEADER_CONSECUTIVE_THRESHOLD:
+        return (
+            f"[AI Team OS] B0.9提醒：Leader已连续执行{consecutive}次工具调用。"
+            "是否应该委派给团队成员？"
+        )
+
+    return None
+
+
+def _check_team_has_permanent_members(event_data: dict) -> str | None:
+    """检查TeamCreate后是否及时添加常驻成员。
+
+    在PostToolUse中检测到TeamCreate完成时，设置标记。
+    在后续PreToolUse中，如果连续多次未看到Agent调用，输出提醒。
+    """
+    tool_name = event_data.get("tool_name", "")
+    event_name = event_data.get("hook_event_name", "")
+    state = _load_supervisor_state()
+
+    if event_name == "PostToolUse" and tool_name == "TeamCreate":
+        # TeamCreate刚完成，开始监控
+        state["team_created_waiting"] = True
+        state["calls_since_team_create"] = 0
+        _save_supervisor_state(state)
+        return None
+
+    if not state.get("team_created_waiting", False):
+        return None
+
+    if event_name != "PreToolUse":
+        return None
+
+    # PreToolUse阶段，检查是否在创建成员
+    if tool_name == "Agent":
+        # Leader正在添加成员，重置监控
+        state["team_created_waiting"] = False
+        state["calls_since_team_create"] = 0
+        _save_supervisor_state(state)
+        return None
+
+    # 非Agent调用，递增计数
+    calls_since = state.get("calls_since_team_create", 0) + 1
+    state["calls_since_team_create"] = calls_since
+    _save_supervisor_state(state)
+
+    if calls_since >= _TEAM_WITHOUT_MEMBERS_THRESHOLD:
+        # 已提醒过，重置（避免反复提醒）
+        state["team_created_waiting"] = False
+        state["calls_since_team_create"] = 0
+        _save_supervisor_state(state)
+        return (
+            "[AI Team OS] B0.10提醒：团队已创建但尚未添加常驻成员（QA+bug-fixer）。"
+            "请立即创建。"
+        )
+
+    return None
+
+
 def main() -> None:
     try:
         # Windows下stdin默认用GBK解码，CC发送的是UTF-8，强制用buffer读取
@@ -110,12 +258,35 @@ def main() -> None:
         if len(sys.argv) > 1 and "hook_event_name" not in payload:
             payload["hook_event_name"] = sys.argv[1]
 
-        # PreToolUse: 检查Agent调用是否带team_name
+        # SubagentStart/SubagentStop: 注入CC团队名称
         event_name = payload.get("hook_event_name", "")
+        if event_name in ("SubagentStart", "SubagentStop") and "cc_team_name" not in payload:
+            session_id = payload.get("session_id", "")
+            cc_team = _resolve_cc_team_name(session_id)
+            if cc_team:
+                payload["cc_team_name"] = cc_team
+
+        # 行为检查：收集所有warnings
+        warnings = []
+
         if event_name == "PreToolUse":
-            warning = _check_agent_team_name(payload)
-            if warning:
-                print(warning)
+            w = _check_agent_team_name(payload)
+            if w:
+                warnings.append(w)
+            w = _check_leader_doing_too_much(payload)
+            if w:
+                warnings.append(w)
+            w = _check_team_has_permanent_members(payload)
+            if w:
+                warnings.append(w)
+
+        if event_name == "PostToolUse":
+            w = _check_team_has_permanent_members(payload)
+            if w:
+                warnings.append(w)
+
+        for w in warnings:
+            print(w)
 
         # 截断大字段
         payload = _trim_payload(payload)

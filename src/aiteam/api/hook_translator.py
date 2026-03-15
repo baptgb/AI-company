@@ -156,16 +156,18 @@ class HookTranslator:
         - agent_type: Agent名称（来自Agent tool的name参数）
         - agent_id: CC内部agent ID（用于关联后续工具调用）
         - session_id: 父session ID
+        - cc_team_name: (可选) CC团队名称，由send_event.py注入
 
         去重策略（4级查找链）：
         1. cc_tool_use_id精确匹配（最快，覆盖重复SubagentStart）
         2. session_id + name匹配
         3. 团队内同名agent匹配（覆盖MCP预注册的情况）
-        4. 以上都没找到 → 创建前再做name去重防并发
+        4. 以上都没找到 → 按cc_team_name查找/创建OS团队 → 注册
         """
         cc_agent_id = payload.get("agent_id", "")
         agent_name = payload.get("agent_type", "unnamed-agent")
         session_id = payload.get("session_id", "")
+        cc_team_name = payload.get("cc_team_name", "")
 
         existing = None
         leader = None
@@ -181,14 +183,18 @@ class HookTranslator:
 
         # 3. 团队内同名agent匹配（覆盖MCP预注册、session_id为空等情况）
         if not existing:
-            leader = await self._find_leader(session_id)
-            if leader:
-                team = await self.repo.find_active_team_by_leader(leader.id)
-                if team:
-                    team_agents = await self.repo.list_agents(team.id)
-                    matches = [a for a in team_agents if a.name == agent_name]
-                    if matches:
-                        existing = matches[0]
+            # 如果有cc_team_name，优先在对应团队中查找
+            if cc_team_name:
+                team = await self._resolve_cc_team(cc_team_name, session_id)
+            if not team:
+                leader = await self._find_leader(session_id)
+                if leader:
+                    team = await self.repo.find_active_team_by_leader(leader.id)
+            if team:
+                team_agents = await self.repo.list_agents(team.id)
+                matches = [a for a in team_agents if a.name == agent_name]
+                if matches:
+                    existing = matches[0]
 
         if existing:
             # 已注册 -> 更新状态、绑定session和CC agent ID
@@ -209,11 +215,15 @@ class HookTranslator:
             )
             return {"status": "updated", "agent_id": existing.id}
 
-        # 4. 未注册 → 自动创建到Leader的active团队
-        if not leader:
-            leader = await self._find_leader(session_id)
-        if leader and not team:
-            team = await self.repo.find_active_team_by_leader(leader.id)
+        # 4. 未注册 → 按cc_team_name查找/创建OS团队，然后注册agent
+        if not team and cc_team_name:
+            team = await self._resolve_cc_team(cc_team_name, session_id)
+
+        if not team:
+            if not leader:
+                leader = await self._find_leader(session_id)
+            if leader:
+                team = await self.repo.find_active_team_by_leader(leader.id)
 
         if not team:
             logger.info(
@@ -318,6 +328,55 @@ class HookTranslator:
                     )
                     updated.append(agent.id)
         return {"status": "updated", "agents_idle": updated}
+
+    async def _resolve_cc_team(self, cc_team_name: str, session_id: str) -> object | None:
+        """根据CC团队名称查找或创建对应的OS团队.
+
+        1. 按名称精确匹配已有OS团队（active状态优先）
+        2. 未找到 → 自动创建同名OS团队
+        """
+        if not cc_team_name:
+            return None
+
+        # 1. 按名称查找已有团队
+        existing_team = await self.repo.get_team_by_name(cc_team_name)
+        if existing_team:
+            logger.info(
+                "CC团队映射: '%s' → 已有OS团队 (id=%s, status=%s)",
+                cc_team_name, existing_team.id, existing_team.status,
+            )
+            return existing_team
+
+        # 2. 自动创建同名OS团队
+        new_team = await self.repo.create_team(
+            name=cc_team_name,
+            mode="coordinate",
+        )
+        logger.info(
+            "CC团队映射: 自动创建OS团队 '%s' (id=%s)",
+            cc_team_name, new_team.id,
+        )
+
+        # 尝试关联到现有项目（通过Leader查找）
+        leader = await self._find_leader(session_id)
+        if leader and leader.project_id:
+            await self.repo.update_team(new_team.id, project_id=leader.project_id)
+            logger.info(
+                "CC团队映射: 团队 '%s' 关联到项目 %s",
+                cc_team_name, leader.project_id,
+            )
+
+        await self.event_bus.emit(
+            "team.created",
+            f"team:{new_team.id}",
+            {
+                "team_id": new_team.id,
+                "team_name": cc_team_name,
+                "source": "cc_team_mapping",
+                "session_id": session_id,
+            },
+        )
+        return new_team
 
     async def _find_leader(self, session_id: str) -> object | None:
         """查找当前session的leader agent.
