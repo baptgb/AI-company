@@ -29,10 +29,13 @@ export function priorityConfig(priority: string) {
 export function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
   const sCfg = statusConfig(task.status);
   const pCfg = priorityConfig(task.priority);
+  const isRunning = task.status === 'running' || task.status === 'in_progress';
 
   return (
     <Card
-      className="cursor-pointer transition-shadow hover:shadow-md overflow-visible"
+      className={`cursor-pointer transition-shadow hover:shadow-md overflow-visible ${
+        isRunning ? 'border-l-4 border-l-blue-500 animate-pulse-subtle' : ''
+      }`}
       onClick={onClick}
     >
       <CardHeader className="pb-1">
