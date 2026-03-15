@@ -11,11 +11,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Users, Bot, ListTodo, CheckCircle, ArrowRight } from 'lucide-react';
+import {
+  Users, Bot, ListTodo, CheckCircle, ArrowRight,
+  Activity, BarChart3, Settings, Wifi, WifiOff,
+  CircleCheck, CircleX, Clock,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTeams } from '@/api/teams';
 import { useProjects } from '@/api/projects';
+import { useEvents } from '@/api/events';
 import { apiFetch } from '@/api/client';
+import { useWSStore } from '@/stores/websocket';
 import type { Project, TeamStatus, APIResponse } from '@/types';
 
 function StatCard({
@@ -107,6 +113,13 @@ export function DashboardPage() {
 
   const { data, isLoading: teamsLoading, error } = useTeams();
   const teams = data?.data ?? [];
+
+  // WebSocket connection status
+  const wsConnected = useWSStore((s) => s.connected);
+
+  // Recent events for activity summary
+  const { data: eventsData, isLoading: eventsLoading } = useEvents({ limit: 5 });
+  const recentEvents = eventsData?.data ?? [];
 
   // Batch-fetch all team statuses using useQueries (stable hook count)
   const statusQueries = useQueries({
@@ -217,6 +230,135 @@ export function DashboardPage() {
           loading={statusLoading && teams.length > 0}
         />
       </div>
+
+      {/* System Health + Quick Actions */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* System Health */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">系统健康状态</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">API 状态</span>
+                {teamsLoading ? (
+                  <Skeleton className="h-5 w-14" />
+                ) : error ? (
+                  <Badge variant="destructive" className="gap-1">
+                    <CircleX className="h-3 w-3" /> 离线
+                  </Badge>
+                ) : (
+                  <Badge variant="default" className="gap-1">
+                    <CircleCheck className="h-3 w-3" /> 在线
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">WebSocket 连接</span>
+                {wsConnected ? (
+                  <Badge variant="default" className="gap-1">
+                    <Wifi className="h-3 w-3" /> 已连接
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1">
+                    <WifiOff className="h-3 w-3" /> 未连接
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">团队数量</span>
+                <span className="text-sm font-medium">{teams.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">最后活动</span>
+                <span className="text-sm font-medium">
+                  {recentEvents.length > 0
+                    ? new Date(recentEvents[0].timestamp).toLocaleString('zh-CN')
+                    : '暂无'}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">快速操作</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <Button variant="outline" className="justify-start gap-2" render={<Link to="/tasks" />}>
+                <ListTodo className="h-4 w-4" />
+                查看任务墙
+              </Button>
+              <Button variant="outline" className="justify-start gap-2" render={<Link to="/analytics" />}>
+                <BarChart3 className="h-4 w-4" />
+                活动分析
+              </Button>
+              <Button variant="outline" className="justify-start gap-2" render={<Link to="/settings" />}>
+                <Settings className="h-4 w-4" />
+                系统设置
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            近期活动
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {eventsLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : recentEvents.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              暂无活动记录
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {recentEvents.map((evt) => (
+                <div
+                  key={evt.id}
+                  className="flex items-center justify-between rounded-md border px-3 py-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Badge variant="outline" className="shrink-0 text-xs">
+                      {evt.type}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground truncate">
+                      {evt.source}
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0 ml-2 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {new Date(evt.timestamp).toLocaleString('zh-CN')}
+                  </span>
+                </div>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-1"
+                render={<Link to="/events" />}
+              >
+                查看全部事件
+                <ArrowRight className="ml-1 h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent Tasks */}
       <Card>
