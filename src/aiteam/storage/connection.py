@@ -19,8 +19,15 @@ from sqlalchemy.ext.asyncio import (
 
 from aiteam.storage.models import Base
 
+def _default_db_url() -> str:
+    """构建默认数据库URL，使用固定路径 ~/.claude/data/ai-team-os/aiteam.db."""
+    data_dir = Path.home() / ".claude" / "data" / "ai-team-os"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return f"sqlite+aiosqlite:///{data_dir / 'aiteam.db'}"
+
+
 # 默认数据库URL
-DEFAULT_DB_URL = "sqlite+aiosqlite:///aiteam.db"
+DEFAULT_DB_URL = _default_db_url()
 
 # 模块级别的引擎和会话工厂缓存
 _engine: AsyncEngine | None = None

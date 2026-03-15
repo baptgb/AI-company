@@ -6,14 +6,23 @@ MCP Server 以 stdio 模式运行，与 FastAPI 进程完全解耦。
 
 from __future__ import annotations
 
+import atexit
 import json
+import logging
 import os
+import socket
+import subprocess
+import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
 
 from fastmcp import FastMCP
+
+logger = logging.getLogger(__name__)
+_api_process: subprocess.Popen | None = None
 
 API_URL = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
 
@@ -950,8 +959,67 @@ def os_resolve_issue(issue_id: str, resolution: str) -> dict[str, Any]:
 
 
 # ============================================================
+# FastAPI auto-start helpers
+# ============================================================
+
+
+def _is_port_open(host: str = "127.0.0.1", port: int = 8000) -> bool:
+    """检查指定端口是否已在监听。"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1)
+        return s.connect_ex((host, port)) == 0
+
+
+def _cleanup_api() -> None:
+    """在进程退出时终止 FastAPI 子进程。"""
+    global _api_process
+    if _api_process is not None and _api_process.poll() is None:
+        _api_process.terminate()
+        try:
+            _api_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            _api_process.kill()
+        _api_process = None
+
+
+def _ensure_api_running() -> None:
+    """如果 FastAPI 尚未运行，则自动拉起子进程。
+
+    MCP Server 以 stdio 模式通信，子进程的 stdout 必须重定向到 DEVNULL
+    以避免污染 MCP 协议通道。
+    """
+    global _api_process
+    if _is_port_open():
+        logger.info("FastAPI already running on port 8000, skipping auto-start")
+        return
+    logger.info("Starting FastAPI subprocess on port 8000...")
+    try:
+        _api_process = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "aiteam.api.app:create_app",
+             "--host", "127.0.0.1", "--port", "8000", "--factory"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+    except Exception as exc:
+        logger.warning("Failed to start FastAPI subprocess: %s", exc)
+        return
+    atexit.register(_cleanup_api)
+    for _i in range(20):
+        time.sleep(0.5)
+        if _is_port_open():
+            logger.info("FastAPI subprocess is ready")
+            return
+        if _api_process.poll() is not None:
+            logger.warning("FastAPI subprocess exited prematurely (code=%s)", _api_process.returncode)
+            _api_process = None
+            return
+    logger.warning("FastAPI subprocess did not become ready within 10s")
+
+
+# ============================================================
 # Entry point
 # ============================================================
 
 if __name__ == "__main__":
+    _ensure_api_running()
     mcp.run()

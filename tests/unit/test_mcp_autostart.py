@@ -1,0 +1,36 @@
+"""Tests for MCP Server FastAPI auto-start helpers."""
+
+from __future__ import annotations
+
+import socket
+import threading
+from unittest.mock import patch
+
+from aiteam.mcp.server import _is_port_open, _ensure_api_running
+
+
+def test_is_port_open_returns_false():
+    """未监听的端口应返回 False。"""
+    # 使用一个极不可能被占用的高端口
+    assert _is_port_open("127.0.0.1", 59999) is False
+
+
+def test_is_port_open_returns_true():
+    """已监听的端口应返回 True。"""
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+    try:
+        assert _is_port_open("127.0.0.1", port) is True
+    finally:
+        srv.close()
+
+
+@patch("aiteam.mcp.server._is_port_open", return_value=True)
+@patch("aiteam.mcp.server.subprocess.Popen")
+def test_ensure_api_skips_when_running(mock_popen, mock_port):
+    """端口已被占用时不应启动子进程。"""
+    _ensure_api_running()
+    mock_popen.assert_not_called()
