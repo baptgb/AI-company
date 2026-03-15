@@ -322,29 +322,55 @@ class HookTranslator:
     async def _find_leader(self, session_id: str) -> object | None:
         """查找当前session的leader agent.
 
-        严格按session_id匹配，避免错误关联到其他session的agent。
+        查找策略：
+        1. 按session_id精确匹配（最快）
+        2. 按role="leader"跨session回退（覆盖DB迁移/API重启后session_id失效）
+        找到Leader后自动绑定当前session_id（self-heal）。
         """
-        if not session_id:
+        # 1. 按session_id精确匹配
+        if session_id:
+            agents = await self.repo.find_agents_by_session(session_id)
+            if agents:
+                # 优先返回leader角色的agent
+                leaders = [a for a in agents if a.role == "leader"]
+                if leaders:
+                    return leaders[0]
+
+                # 其次返回api-source的agent
+                api_matches = [a for a in agents if a.source == "api"]
+                if api_matches:
+                    return api_matches[0]
+
+                # 最后返回任何匹配的agent（BUSY优先）
+                agents.sort(key=lambda a: (0 if a.status == "busy" else 1))
+                return agents[0]
+
+        # 2. FALLBACK: 按role="leader"跨session查找
+        # 覆盖DB迁移、API重启后session_id不匹配的情况
+        all_leaders = await self.repo.find_agents_by_role("leader")
+        if not all_leaders:
             return None
 
-        # 按session_id精确匹配
-        agents = await self.repo.find_agents_by_session(session_id)
-        if not agents:
-            return None
+        # 优先返回有active team的Leader
+        chosen = None
+        for leader in all_leaders:
+            team = await self.repo.find_active_team_by_leader(leader.id)
+            if team:
+                chosen = leader
+                break
 
-        # 优先返回leader角色的agent
-        leaders = [a for a in agents if a.role == "leader"]
-        if leaders:
-            return leaders[0]
+        if not chosen:
+            chosen = all_leaders[0]
 
-        # 其次返回api-source的agent
-        api_matches = [a for a in agents if a.source == "api"]
-        if api_matches:
-            return api_matches[0]
+        # Self-heal：绑定当前session_id，后续查找可走快速路径
+        if session_id and chosen.session_id != session_id:
+            await self.repo.update_agent(chosen.id, session_id=session_id)
+            logger.info(
+                "Leader self-heal: '%s' session绑定 %s",
+                chosen.name, session_id[:8],
+            )
 
-        # 最后返回任何匹配的agent（BUSY优先）
-        agents.sort(key=lambda a: (0 if a.status == "busy" else 1))
-        return agents[0]
+        return chosen
 
     async def _self_heal_agent(self, agent, trigger: str = "self_heal") -> None:
         """自愈：IDLE agent收到工具事件 → 修正为BUSY."""

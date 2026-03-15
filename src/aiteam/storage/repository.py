@@ -910,6 +910,18 @@ class StorageRepository:
             row = result.scalar_one_or_none()
             return row.to_pydantic() if row else None
 
+    async def find_agents_by_role(self, role: str) -> list[Agent]:
+        """按角色查找所有Agent（跨团队）."""
+        async with get_session(self._db_url) as session:
+            stmt = (
+                select(AgentModel)
+                .where(AgentModel.role == role)
+                .order_by(AgentModel.created_at.desc())
+            )
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [r.to_pydantic() for r in rows]
+
     async def count_agents_by_source(
         self, source: str, session_id: str | None = None,
     ) -> int:
