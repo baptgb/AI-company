@@ -9,8 +9,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from aiteam.api.deps import cleanup_dependencies, init_dependencies
@@ -60,9 +61,19 @@ def create_app() -> FastAPI:
     _dist_dir = _project_root / "dashboard" / "dist"
 
     if _dist_dir.is_dir():
+        # /assets 静态资源直接由StaticFiles处理
         _assets_dir = _dist_dir / "assets"
         if _assets_dir.is_dir():
             app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="dashboard-assets")
-        app.mount("/", StaticFiles(directory=str(_dist_dir), html=True), name="dashboard")
+
+        # SPA catch-all: 非API、非assets的路径全部返回index.html
+        @app.get("/{path:path}")
+        async def spa_fallback(path: str) -> FileResponse:
+            if path.startswith("api/") or path.startswith("assets/"):
+                raise HTTPException(status_code=404)
+            index = _dist_dir / "index.html"
+            if index.exists():
+                return FileResponse(str(index))
+            raise HTTPException(status_code=404)
 
     return app

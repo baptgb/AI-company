@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { useTeams } from '@/api/teams';
 import { useProjects } from '@/api/projects';
 import { apiFetch } from '@/api/client';
-import type { Team, Project, TeamStatus, APIResponse } from '@/types';
+import type { Project, TeamStatus, APIResponse } from '@/types';
 
 function StatCard({
   title,

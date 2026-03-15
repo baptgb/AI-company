@@ -233,7 +233,7 @@ export function TasksPage() {
             {projectTeams.length > 1 && (
               <div className="space-y-2">
                 <Label htmlFor="task-team">目标团队</Label>
-                <Select value={newTaskTeamId || projectTeams[0]?.id || ''} onValueChange={setNewTaskTeamId}>
+                <Select value={newTaskTeamId || projectTeams[0]?.id || ''} onValueChange={(v) => setNewTaskTeamId(v ?? '')}>
                   <SelectTrigger>
                     <SelectValue placeholder="选择团队" />
                   </SelectTrigger>
