@@ -53,7 +53,7 @@ export function EventsPage() {
     limit: Number(limit),
   });
 
-  const apiEvents = data?.data ?? [];
+  const apiEvents = useMemo(() => data?.data ?? [], [data?.data]);
 
   // Merge WS events on top of API events, deduplicated by id
   const mergedEvents = useMemo(() => {

@@ -27,7 +27,7 @@ export function MeetingDetailPage() {
     useMeetingMessages(meetingId ?? '');
 
   const meeting = meetingData?.data;
-  const messages = messagesData?.data ?? [];
+  const messages = useMemo(() => messagesData?.data ?? [], [messagesData?.data]);
 
   // Group messages by round_number
   const grouped = useMemo<MessageGroup[]>(() => {

@@ -106,7 +106,7 @@ export function TeamDetailPage() {
 
   const team = teamData?.data;
   const status = statusData?.data;
-  const agents = agentsData?.data ?? [];
+  const agents = useMemo(() => agentsData?.data ?? [], [agentsData?.data]);
 
   // Sort agents: BUSY > IDLE > OFFLINE
   const sortedAgents = useMemo(() => {

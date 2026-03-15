@@ -77,9 +77,6 @@ def build_coordinate_graph(
     # 构建边: START → leader_plan
     graph.add_edge(START, "leader_plan")
 
-    # leader_plan之后的下一个节点取决于是否需要审批
-    post_plan_node = "approval" if require_approval else None
-
     if require_approval:
         graph.add_edge("leader_plan", "approval")
 

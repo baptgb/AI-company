@@ -2,14 +2,6 @@ import { useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -36,6 +28,8 @@ import {
   Crown,
   History,
   Users,
+  Clock,
+  UserPlus,
 } from 'lucide-react';
 import { useProject } from '@/api/projects';
 import { useTeams } from '@/api/teams';
@@ -43,6 +37,7 @@ import { useAgents, useCreateAgent, useDeleteAgent } from '@/api/agents';
 import { useRunTask } from '@/api/tasks';
 import { useCreateMeeting } from '@/api/meetings';
 import { LiveIndicator } from '@/components/shared/LiveIndicator';
+import { RelativeTime } from '@/components/shared/RelativeTime';
 import type { Team, Agent } from '@/types';
 
 /* ── Status Badges ── */
@@ -155,41 +150,58 @@ function ActiveTeamContent({ team }: { team: Team }) {
         {isLoading ? (
           <Skeleton className="h-20 w-full" />
         ) : agents.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">暂无成员，点击 "+ Agent" 添加</p>
+          <div className="flex flex-col items-center gap-3 py-8">
+            <UserPlus className="h-8 w-8 text-muted-foreground/40" />
+            <div className="text-center">
+              <p className="text-sm font-medium text-muted-foreground">暂无团队成员</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">点击上方 "+ Agent" 添加成员开始协作</p>
+            </div>
+          </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Agent</TableHead>
-                <TableHead>角色</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>当前任务</TableHead>
-                <TableHead>来源</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedAgents.map((agent) => (
-                <TableRow key={agent.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Bot className="h-4 w-4 text-muted-foreground" />
-                      {agent.name}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {sortedAgents.map((agent) => {
+              const isBusy = agent.status.toLowerCase() === 'busy';
+              return (
+                <div
+                  key={agent.id}
+                  className={`relative rounded-lg border p-3 transition-colors ${
+                    isBusy
+                      ? 'border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/10'
+                      : 'border-l-4 border-l-gray-300 dark:border-l-gray-600'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Bot className={`h-4 w-4 flex-shrink-0 ${isBusy ? 'text-green-600' : 'text-muted-foreground'}`} />
+                      <span className="font-medium text-sm truncate">{agent.name}</span>
                     </div>
-                  </TableCell>
-                  <TableCell>{agent.role}</TableCell>
-                  <TableCell><AgentStatusBadge status={agent.status} /></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{agent.current_task || '--'}</TableCell>
-                  <TableCell><Badge variant="outline">{agent.source ?? 'api'}</Badge></TableCell>
-                  <TableCell>
-                    <Button size="icon" variant="ghost" onClick={() => setDeleteTarget({ id: agent.id, name: agent.name })}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <AgentStatusBadge status={agent.status} />
+                      {isBusy && <LiveIndicator />}
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setDeleteTarget({ id: agent.id, name: agent.name })}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    <p><span className="text-muted-foreground/70">角色:</span> {agent.role}</p>
+                    <p className="truncate">
+                      <span className="text-muted-foreground/70">任务:</span>{' '}
+                      {agent.current_task || <span className="italic">待分配</span>}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-muted-foreground/50" />
+                      {agent.last_active_at ? (
+                        <RelativeTime date={agent.last_active_at} />
+                      ) : (
+                        <span className="italic">无活动记录</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </CardContent>
 

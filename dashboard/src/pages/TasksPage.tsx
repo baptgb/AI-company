@@ -43,7 +43,7 @@ export function TasksPage() {
   const projects = projectsData?.data ?? [];
 
   const { data: teamsData } = useTeams();
-  const teams = teamsData?.data ?? [];
+  const teams = useMemo(() => teamsData?.data ?? [], [teamsData?.data]);
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const activeProjectId = selectedProjectId || projects[0]?.id || '';
