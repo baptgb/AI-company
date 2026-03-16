@@ -114,7 +114,7 @@ async def _startup_reconciliation(repo: StorageRepository) -> None:
             needs_update = False
             updates: dict = {}
             if agent.status == AgentStatus.BUSY:
-                updates["status"] = AgentStatus.IDLE.value
+                updates["status"] = AgentStatus.WAITING.value
                 updates["current_task"] = None
                 needs_update = True
             if agent.session_id:

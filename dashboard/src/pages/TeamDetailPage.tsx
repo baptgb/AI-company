@@ -50,9 +50,9 @@ import { ActivityLog } from '@/components/agents/ActivityLog';
 
 function StatusBadge({ status }: { status: string }) {
   const variant =
-    status === 'active' || status === 'online'
+    status === 'active' || status === 'online' || status === 'busy'
       ? 'default'
-      : status === 'idle'
+      : status === 'waiting'
         ? 'secondary'
         : status === 'error' || status === 'offline'
           ? 'destructive'
@@ -60,13 +60,15 @@ function StatusBadge({ status }: { status: string }) {
   const label =
     status === 'active' || status === 'online'
       ? '在线'
-      : status === 'idle'
-        ? '空闲'
-        : status === 'error'
-          ? '错误'
-          : status === 'offline'
-            ? '离线'
-            : status;
+      : status === 'busy'
+        ? '工作中'
+        : status === 'waiting'
+          ? '等待'
+          : status === 'error'
+            ? '错误'
+            : status === 'offline'
+              ? '关闭'
+              : status;
   return <Badge variant={variant}>{label}</Badge>;
 }
 
@@ -110,7 +112,7 @@ export function TeamDetailPage() {
 
   // Sort agents: BUSY > IDLE > OFFLINE
   const sortedAgents = useMemo(() => {
-    const priority: Record<string, number> = { busy: 0, active: 0, online: 0, idle: 1, offline: 2, error: 3 };
+    const priority: Record<string, number> = { busy: 0, active: 0, online: 0, waiting: 1, offline: 2, error: 3 };
     return [...agents].sort(
       (a, b) => (priority[a.status.toLowerCase()] ?? 99) - (priority[b.status.toLowerCase()] ?? 99),
     );

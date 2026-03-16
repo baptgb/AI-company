@@ -221,7 +221,7 @@ def agent_update_status(
 
     Args:
         agent_id: Agent ID
-        status: 新状态，可选 "idle"、"busy"、"offline"
+        status: 新状态，可选 "busy"、"waiting"、"offline"
 
     Returns:
         更新后的 Agent 信息

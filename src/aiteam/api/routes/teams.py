@@ -100,7 +100,7 @@ async def update_team(
         for agent in agents:
             if agent.status == AgentStatus.BUSY:
                 await repo.update_agent(
-                    agent.id, status="idle", current_task=None
+                    agent.id, status="offline", current_task=None
                 )
     elif body.status is not None:
         team = await repo.update_team(team.id, status=body.status)
@@ -164,7 +164,7 @@ async def team_briefing(
     pending_tasks = ready_tasks + blocked_tasks
 
     # 6. 生成 _hints 建议文本
-    idle_agents = [a for a in agents if a.status == AgentStatus.IDLE]
+    idle_agents = [a for a in agents if a.status == AgentStatus.WAITING]
     busy_agents = [a for a in agents if a.status == AgentStatus.BUSY]
     hints: list[str] = []
     if idle_agents:

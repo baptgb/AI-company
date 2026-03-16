@@ -44,8 +44,8 @@ import type { Team, Agent } from '@/types';
 
 function AgentStatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
-  const variant = s === 'busy' ? 'default' : s === 'idle' ? 'secondary' : s === 'offline' ? 'destructive' : 'outline';
-  const label = s === 'busy' ? '工作中' : s === 'idle' ? '空闲' : s === 'offline' ? '离线' : status;
+  const variant = s === 'busy' ? 'default' : s === 'waiting' ? 'secondary' : s === 'offline' ? 'destructive' : 'outline';
+  const label = s === 'busy' ? '工作中' : s === 'waiting' ? '等待' : s === 'offline' ? '关闭' : status;
   return <Badge variant={variant}>{label}</Badge>;
 }
 
@@ -109,7 +109,7 @@ function ActiveTeamContent({ team }: { team: Team }) {
 
   const agents = (agentsData?.data ?? []).filter((a) => a.role !== 'leader');
   const sortedAgents = useMemo(() => {
-    const priority: Record<string, number> = { busy: 0, idle: 1, offline: 2 };
+    const priority: Record<string, number> = { busy: 0, waiting: 1, offline: 2 };
     return [...agents].sort((a, b) => (priority[a.status.toLowerCase()] ?? 99) - (priority[b.status.toLowerCase()] ?? 99));
   }, [agents]);
 

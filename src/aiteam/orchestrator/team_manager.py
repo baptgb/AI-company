@@ -357,7 +357,7 @@ class TeamManager:
             )
 
             # 将所有Agent恢复IDLE
-            await self._set_agents_status(agents, AgentStatus.IDLE, team.id)
+            await self._set_agents_status(agents, AgentStatus.WAITING, team.id)
 
             await self._emit(
                 "task.completed",
@@ -390,7 +390,7 @@ class TeamManager:
             )
 
             # 将所有Agent恢复IDLE
-            await self._set_agents_status(agents, AgentStatus.IDLE, team.id)
+            await self._set_agents_status(agents, AgentStatus.WAITING, team.id)
 
             await self._emit(
                 "task.failed",

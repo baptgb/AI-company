@@ -198,11 +198,18 @@ class HookTranslator:
 
         if existing:
             # 已注册 -> 更新状态、绑定session和CC agent ID
-            await self.repo.update_agent(
-                existing.id, status="busy", cc_tool_use_id=cc_agent_id,
-                session_id=session_id,
-                last_active_at=datetime.now(),
-            )
+            update_fields: dict = {
+                "status": "busy",
+                "cc_tool_use_id": cc_agent_id,
+                "session_id": session_id,
+                "last_active_at": datetime.now(),
+            }
+            # 如果已有role含 " — "，自动分割为role + current_task
+            if existing.role and " — " in existing.role:
+                parts = existing.role.split(" — ", 1)
+                update_fields["role"] = parts[0].strip()
+                update_fields["current_task"] = parts[1].strip()
+            await self.repo.update_agent(existing.id, **update_fields)
             await self.event_bus.emit(
                 "agent.status_changed",
                 f"agent:{existing.id}",
@@ -248,21 +255,32 @@ class HookTranslator:
             )
             return {"status": "updated", "agent_id": existing.id}
 
+        # 从agent_name中提取role和current_task（如含 " — " 分隔符）
+        if " — " in agent_name:
+            parts = agent_name.split(" — ", 1)
+            auto_role = parts[0].strip()
+            auto_task = parts[1].strip()
+        else:
+            auto_role = agent_name
+            auto_task = None
+
         new_agent = await self.repo.create_agent(
             team_id=team.id,
             name=agent_name,
-            role=agent_name,
+            role=auto_role,
             source="hook",
             session_id=session_id,
             cc_tool_use_id=cc_agent_id,
         )
-        # create_agent默认status=idle，立即设为busy
-        await self.repo.update_agent(
-            new_agent.id,
-            status="busy",
-            project_id=team.project_id,
-            last_active_at=datetime.now(),
-        )
+        # create_agent默认status=waiting，立即设为busy
+        update_kwargs: dict = {
+            "status": "busy",
+            "project_id": team.project_id,
+            "last_active_at": datetime.now(),
+        }
+        if auto_task:
+            update_kwargs["current_task"] = auto_task
+        await self.repo.update_agent(new_agent.id, **update_kwargs)
 
         await self.event_bus.emit(
             "agent.status_changed",
@@ -295,7 +313,7 @@ class HookTranslator:
             agent = await self._resolve_agent(cc_agent_id, agent_name, session_id)
             if agent and agent.status == "busy":
                 await self.repo.update_agent(
-                    agent.id, status="idle", current_task=None,
+                    agent.id, status="waiting", current_task=None,
                     last_active_at=datetime.now(),
                 )
                 await self.event_bus.emit(
@@ -304,7 +322,7 @@ class HookTranslator:
                     {
                         "agent_id": agent.id,
                         "name": agent.name,
-                        "status": "idle",
+                        "status": "waiting",
                         "trigger": "hook",
                     },
                 )
@@ -315,19 +333,19 @@ class HookTranslator:
             for agent in agents:
                 if agent.status == "busy":
                     await self.repo.update_agent(
-                        agent.id, status="idle", last_active_at=datetime.now(),
+                        agent.id, status="waiting", last_active_at=datetime.now(),
                     )
                     await self.event_bus.emit(
                         "agent.status_changed",
                         f"agent:{agent.id}",
                         {
                             "agent_id": agent.id,
-                            "status": "idle",
+                            "status": "waiting",
                             "trigger": "hook",
                         },
                     )
                     updated.append(agent.id)
-        return {"status": "updated", "agents_idle": updated}
+        return {"status": "updated", "agents_waiting": updated}
 
     async def _resolve_cc_team(self, cc_team_name: str, session_id: str) -> object | None:
         """根据CC团队名称查找或创建对应的OS团队.
@@ -432,8 +450,8 @@ class HookTranslator:
         return chosen
 
     async def _self_heal_agent(self, agent, trigger: str = "self_heal") -> None:
-        """自愈：IDLE agent收到工具事件 → 修正为BUSY."""
-        if agent.status != "idle":
+        """自愈：WAITING agent收到工具事件 → 修正为BUSY."""
+        if agent.status != "waiting":
             return
         await self.repo.update_agent(agent.id, status="busy")
         await self.event_bus.emit(
@@ -442,12 +460,12 @@ class HookTranslator:
             {
                 "agent_id": agent.id,
                 "name": agent.name,
-                "old_status": "idle",
+                "old_status": "waiting",
                 "status": "busy",
                 "trigger": trigger,
             },
         )
-        logger.info("自愈: %s IDLE→BUSY (trigger=%s)", agent.name, trigger)
+        logger.info("自愈: %s WAITING→BUSY (trigger=%s)", agent.name, trigger)
 
     @staticmethod
     def _extract_file_path(tool_input: dict | str) -> str:
@@ -880,13 +898,10 @@ class HookTranslator:
     async def _on_session_end(self, payload: dict) -> dict:
         """处理CC会话结束 — 对账并清理状态."""
         session_id = payload.get("session_id", "")
-        # 对账：将本session所有agent设为IDLE并清除session_id
+        # 对账：将本session所有agent设为OFFLINE并清除session_id
         agents = await self.repo.find_agents_by_session(session_id)
         for agent in agents:
-            updates: dict = {"session_id": None}
-            if agent.status == "busy":
-                updates["status"] = "idle"
-                updates["current_task"] = None
+            updates: dict = {"session_id": None, "status": "offline", "current_task": None}
             await self.repo.update_agent(agent.id, **updates)
 
         # 统计对账
@@ -928,7 +943,7 @@ class HookTranslator:
         for agent in agents:
             if agent.status == "busy" and agent.source == "hook":
                 await self.repo.update_agent(
-                    agent.id, status="idle", current_task=None,
+                    agent.id, status="offline", current_task=None,
                 )
                 await self.event_bus.emit(
                     "agent.status_changed",
@@ -936,7 +951,7 @@ class HookTranslator:
                     {
                         "agent_id": agent.id,
                         "name": agent.name,
-                        "status": "idle",
+                        "status": "offline",
                         "trigger": "stop",
                     },
                 )
@@ -954,7 +969,7 @@ class HookTranslator:
                         if agent.last_active_at and agent.last_active_at < cutoff:
                             continue  # 超出时间窗口，跳过（可能属于其他session）
                         await self.repo.update_agent(
-                            agent.id, status="idle", current_task=None,
+                            agent.id, status="offline", current_task=None,
                         )
                         await self.event_bus.emit(
                             "agent.status_changed",
@@ -962,14 +977,14 @@ class HookTranslator:
                             {
                                 "agent_id": agent.id,
                                 "name": agent.name,
-                                "status": "idle",
+                                "status": "offline",
                                 "trigger": "stop_global",
                             },
                         )
                         updated.append(agent.id)
 
-        logger.info("Stop event: %d hook agents set to idle", len(updated))
-        return {"status": "cleaned", "agents_idle": updated}
+        logger.info("Stop event: %d hook agents set to offline", len(updated))
+        return {"status": "cleaned", "agents_offline": updated}
 
     async def _find_or_create_session_team(
         self, session_id: str, payload: dict,

@@ -95,11 +95,9 @@ def print_agents_table(agents: list[Agent]) -> None:
 
     for agent in agents:
         status_color = {
-            "idle": "green",
-            "busy": "yellow",
-            "error": "red",
+            "busy": "green",
+            "waiting": "blue",
             "offline": "dim",
-            "recovering": "cyan",
         }.get(agent.status.value, "white")
 
         table.add_row(

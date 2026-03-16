@@ -116,13 +116,13 @@ class StateReaper:
         if elapsed <= HOOK_SOURCE_TIMEOUT:
             return False
 
-        # 超时 → 设为IDLE
+        # 超时 → 设为WAITING
         logger.warning(
-            "hook-agent超时: %s (team=%s), 已%.0f秒无活动，设为IDLE",
+            "hook-agent超时: %s (team=%s), 已%.0f秒无活动，设为WAITING",
             agent.name, agent.team_id, elapsed,
         )
         await self._repo.update_agent(
-            agent.id, status=AgentStatus.IDLE.value, current_task=None,
+            agent.id, status=AgentStatus.WAITING.value, current_task=None,
         )
         await self._event_bus.emit(
             "agent.status_changed",
@@ -131,7 +131,7 @@ class StateReaper:
                 "agent_id": agent.id,
                 "name": agent.name,
                 "old_status": "busy",
-                "status": "idle",
+                "status": "waiting",
                 "trigger": "timeout_reaper",
                 "elapsed_seconds": round(elapsed),
             },
@@ -155,13 +155,13 @@ class StateReaper:
         if elapsed <= API_SOURCE_TIMEOUT_NO_FILE:
             return False
 
-        # 超时 → 设为IDLE
+        # 超时 → 设为WAITING
         logger.warning(
-            "api-agent超时: %s, 已%.0f秒无活动，设为IDLE",
+            "api-agent超时: %s, 已%.0f秒无活动，设为WAITING",
             agent.name, elapsed,
         )
         await self._repo.update_agent(
-            agent.id, status=AgentStatus.IDLE.value, current_task=None,
+            agent.id, status=AgentStatus.WAITING.value, current_task=None,
         )
         await self._event_bus.emit(
             "agent.status_changed",
@@ -170,7 +170,7 @@ class StateReaper:
                 "agent_id": agent.id,
                 "name": agent.name,
                 "old_status": "busy",
-                "status": "idle",
+                "status": "waiting",
                 "trigger": "timeout_reaper",
                 "elapsed_seconds": round(elapsed),
             },

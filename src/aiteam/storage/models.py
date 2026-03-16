@@ -197,7 +197,7 @@ class AgentModel(Base):
     role: Mapped[str] = mapped_column(String(100), nullable=False)
     system_prompt: Mapped[str] = mapped_column(Text, default="")
     model: Mapped[str] = mapped_column(String(100), default="claude-opus-4-6")
-    status: Mapped[str] = mapped_column(String(20), default="idle")
+    status: Mapped[str] = mapped_column(String(20), default="waiting")
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     source: Mapped[str] = mapped_column(String(20), default="api")
     session_id: Mapped[str | None] = mapped_column(String(100), nullable=True)

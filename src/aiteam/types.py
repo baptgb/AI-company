@@ -40,13 +40,11 @@ class TaskStatus(str, enum.Enum):
 
 
 class AgentStatus(str, enum.Enum):
-    """Agent状态."""
+    """Agent状态 — 三状态模型."""
 
-    IDLE = "idle"
-    BUSY = "busy"
-    ERROR = "error"
-    OFFLINE = "offline"
-    RECOVERING = "recovering"
+    BUSY = "busy"        # 工作中 — 正在执行工具调用
+    WAITING = "waiting"  # 等待 — 存活但等待输入（turn间隙）
+    OFFLINE = "offline"  # 关闭 — 已终止
 
 
 class MeetingStatus(str, enum.Enum):
@@ -222,7 +220,7 @@ class Agent(BaseModel):
     role: str
     system_prompt: str = ""
     model: str = "claude-opus-4-6"
-    status: AgentStatus = AgentStatus.IDLE
+    status: AgentStatus = AgentStatus.WAITING
     config: dict[str, Any] = Field(default_factory=dict)
     source: str = "api"  # "api" = CLAUDE.md主动注册, "hook" = hooks自动捕获
     session_id: str | None = None  # 关联的CC会话ID

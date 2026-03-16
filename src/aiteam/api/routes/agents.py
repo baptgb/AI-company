@@ -49,14 +49,24 @@ async def add_agent(
     existing_agents = await repo.list_agents(team.id)
     existing = next((a for a in existing_agents if a.name == body.name), None)
 
+    # 如果role含 " — "，自动分割为role + current_task
+    effective_role = body.role
+    auto_task: str | None = None
+    if body.role and " — " in body.role:
+        parts = body.role.split(" — ", 1)
+        effective_role = parts[0].strip()
+        auto_task = parts[1].strip()
+
     if existing:
         # 同名agent已存在（可能由hook自动注册）→ 更新而非重复创建
         update_fields: dict[str, object] = {
             "status": "busy",
             "last_active_at": datetime.now(),
         }
-        if body.role:
-            update_fields["role"] = body.role
+        if effective_role:
+            update_fields["role"] = effective_role
+        if auto_task:
+            update_fields["current_task"] = auto_task
         if body.system_prompt:
             update_fields["system_prompt"] = body.system_prompt
         if body.model:
@@ -68,12 +78,15 @@ async def add_agent(
         agent = await manager.add_agent(
             team_name=team_id,
             name=body.name,
-            role=body.role,
+            role=effective_role,
             system_prompt=body.system_prompt,
             model=body.model,
         )
         # 注册即工作 — 默认设为busy
-        await repo.update_agent(agent.id, status="busy", last_active_at=datetime.now())
+        update_kwargs: dict[str, object] = {"status": "busy", "last_active_at": datetime.now()}
+        if auto_task:
+            update_kwargs["current_task"] = auto_task
+        await repo.update_agent(agent.id, **update_kwargs)
 
     # 获取团队快照：当前所有agent、待办任务和最近会议
     team = await manager.get_team(team_id)
