@@ -912,22 +912,20 @@ class HookTranslator:
             source="api", session_id=session_id,
         )
 
-        # 关闭Leader的active团队（session结束=团队结束）
-        leader = await self._find_leader(session_id)
+        # 关闭所有active团队（session结束=整个工作结束）
         closed_teams = []
-        if leader:
-            team = await self.repo.find_active_team_by_leader(leader.id)
-            if team:
+        all_teams = await self.repo.list_teams()
+        for team in all_teams:
+            if team.status == "active":
                 await self.repo.update_team(team.id, status="completed")
                 closed_teams.append(team.name)
                 logger.info("SessionEnd: 关闭团队 '%s'", team.name)
-            # 也关闭所有该项目的active团队（同一session可能创建了多个）
-            if team and team.project_id:
-                project_teams = await self.repo.list_teams_by_project(team.project_id)
-                for pt in project_teams:
-                    if pt.status == "active" and pt.id != (team.id if team else ""):
-                        await self.repo.update_team(pt.id, status="completed")
-                        closed_teams.append(pt.name)
+        # 所有非offline的agent设为offline
+        for team in all_teams:
+            team_agents = await self.repo.list_agents(team.id)
+            for agent in team_agents:
+                if agent.status != "offline":
+                    await self.repo.update_agent(agent.id, status="offline", current_task=None)
 
         await self.event_bus.emit(
             "cc.session_end",
