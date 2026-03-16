@@ -11,7 +11,7 @@ from pathlib import Path
 
 def main():
     try:
-        input_data = sys.stdin.read()
+        input_data = sys.stdin.buffer.read().decode("utf-8")
         record = {
             "trigger": "unknown",
             "timestamp": datetime.now(timezone.utc).isoformat(),

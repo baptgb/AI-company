@@ -83,7 +83,7 @@ def main():
                 # Try parent
                 check_path = check_path.rsplit("/", 1)[0] if "/" in check_path else ""
 
-            if claude_project_path.is_dir():
+            if claude_project_path is not None and claude_project_path.is_dir():
                 for jsonl_file in claude_project_path.glob("*.jsonl"):
                     if jsonl_file.name.startswith("agent-"):
                         continue

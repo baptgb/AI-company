@@ -42,6 +42,6 @@ class EventBus:
             )
             await ws_manager.broadcast_event(ws_event)
         except Exception:
-            logger.warning("WS broadcast failed for %s", event_type)
+            logger.warning("WS broadcast failed for %s", event_type, exc_info=True)
 
         return event

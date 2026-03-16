@@ -265,7 +265,7 @@ export function SettingsPage() {
               <div className="flex justify-end">
                 <Button onClick={handleSave}>
                   <Save className="size-4" data-icon="inline-start" />
-                  保存设置
+                  保存（演示）
                 </Button>
               </div>
             </CardContent>
@@ -384,7 +384,7 @@ export function SettingsPage() {
             <div className="flex justify-end">
               <Button onClick={handleSave}>
                 <Save className="size-4" data-icon="inline-start" />
-                保存设置
+                保存（演示）
               </Button>
             </div>
           </div>

@@ -78,11 +78,7 @@ def calculate_task_score(task: Task, now: datetime | None = None) -> float:
         1.0,
     )
 
-    # 被阻塞大幅降权
-    if task.status == TaskStatus.BLOCKED:
-        readiness = 0.1
-    else:
-        readiness = 1.0
+    readiness = 1.0
 
     # 时间衰减（越久未处理分数略升，防饿死）
     age_hours = (now - task.created_at).total_seconds() / 3600

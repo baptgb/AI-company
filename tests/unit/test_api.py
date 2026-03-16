@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from aiteam.api import deps
 from aiteam.api.app import create_app
 from aiteam.api.event_bus import EventBus
+from aiteam.api.hook_translator import HookTranslator
 from aiteam.memory.store import MemoryStore
 from aiteam.orchestrator.team_manager import TeamManager
 from aiteam.storage.connection import close_db
@@ -28,12 +29,14 @@ def app_client():
     memory = MemoryStore(repository=repo)
     manager = TeamManager(repository=repo, memory=memory)
 
-    # 注入到deps模块（含EventBus）
+    # 注入到deps模块（含EventBus和HookTranslator）
     event_bus = EventBus(repo=repo)
+    hook_translator = HookTranslator(repo=repo, event_bus=event_bus)
     deps._repository = repo
     deps._memory_store = memory
     deps._event_bus = event_bus
     deps._manager = manager
+    deps._hook_translator = hook_translator
 
     app = create_app()
 
@@ -55,6 +58,7 @@ def app_client():
     deps._memory_store = None
     deps._event_bus = None
     deps._manager = None
+    deps._hook_translator = None
 
 
 # ============================================================
@@ -310,3 +314,62 @@ def test_openapi_docs_accessible(app_client):
     data = resp.json()
     assert data["info"]["title"] == "AI Team OS"
     assert "/api/teams" in data["paths"]
+
+
+# ============================================================
+# Hook Schema验证
+# ============================================================
+
+
+def test_hook_event_valid_payload(app_client):
+    """测试Hook端点接受合法payload."""
+    resp = app_client.post(
+        "/api/hooks/event",
+        json={
+            "hook_event_name": "SubagentStart",
+            "session_id": "sess-123",
+            "agent_id": "agent-1",
+            "agent_type": "code",
+            "tool_name": "",
+            "cwd": "/tmp/project",
+            "cc_team_name": "my-team",
+        },
+    )
+    assert resp.status_code == 200
+
+
+def test_hook_event_empty_payload(app_client):
+    """测试Hook端点接受空payload（所有字段有默认值）."""
+    resp = app_client.post("/api/hooks/event", json={})
+    assert resp.status_code == 200
+
+
+def test_hook_event_extra_fields_allowed(app_client):
+    """测试Hook端点允许额外字段（向后兼容）."""
+    resp = app_client.post(
+        "/api/hooks/event",
+        json={
+            "hook_event_name": "PostToolUse",
+            "unknown_future_field": "some_value",
+            "another_field": 42,
+        },
+    )
+    assert resp.status_code == 200
+
+
+def test_hook_event_field_too_long(app_client):
+    """测试Hook端点拒绝超长字段."""
+    resp = app_client.post(
+        "/api/hooks/event",
+        json={"hook_event_name": "x" * 100},  # max_length=50
+    )
+    assert resp.status_code == 422
+
+
+def test_hook_event_invalid_type(app_client):
+    """测试Hook端点拒绝错误类型字段."""
+    resp = app_client.post(
+        "/api/hooks/event",
+        json={"tool_input": "not_a_dict"},
+    )
+    assert resp.status_code == 422

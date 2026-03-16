@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def main():
-    project_root = Path("C:/Users/TUF/Desktop/AI\u56e2\u961f\u6846\u67b6/ai-team-os")
+    project_root = Path(__file__).resolve().parent.parent.parent
     claude_md = project_root / "CLAUDE.md"
 
     output = ""

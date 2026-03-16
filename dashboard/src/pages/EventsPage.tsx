@@ -19,7 +19,6 @@ import {
 import { EventRow } from '@/components/events/EventRow';
 import { useEvents } from '@/api/events';
 import { useWSStore } from '@/stores/websocket';
-import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 import { Radio, Wifi, WifiOff } from 'lucide-react';
 import type { Event } from '@/types';
 
@@ -39,8 +38,6 @@ const LIMIT_OPTIONS = [
 ];
 
 export function EventsPage() {
-  useRealtimeEvents();
-
   const [typeFilter, setTypeFilter] = useState('__all__');
   const [sourceFilter, setSourceFilter] = useState('');
   const [limit, setLimit] = useState('50');

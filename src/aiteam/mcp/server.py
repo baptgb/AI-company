@@ -895,7 +895,7 @@ def taskwall_view(
     if priority:
         params.append(f"priority={urllib.parse.quote(priority)}")
     qs = f"?{'&'.join(params)}" if params else ""
-    return _api_call("GET", f"/api/teams/{team_id}/loop/taskwall{qs}")
+    return _api_call("GET", f"/api/teams/{team_id}/task-wall{qs}")
 
 
 # ============================================================
