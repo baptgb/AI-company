@@ -108,9 +108,14 @@ async def _startup_reconciliation(repo: StorageRepository) -> None:
 
     原理：OS重启意味着之前的CC session已不存在，
     所有残留的BUSY状态和session_id都是僵尸，需要清零。
+    另外，将waiting状态且超过1小时无活动的agent设为offline。
     """
+    from datetime import datetime, timedelta
+
+    stale_cutoff = datetime.now() - timedelta(hours=1)
     teams = await repo.list_teams()
     reconciled = 0
+    stale_count = 0
     for team in teams:
         agents = await repo.list_agents(team.id)
         for agent in agents:
@@ -126,10 +131,23 @@ async def _startup_reconciliation(repo: StorageRepository) -> None:
             if needs_update:
                 await repo.update_agent(agent.id, **updates)
                 reconciled += 1
+
+            # 清理过期agent：waiting且超过1小时无活动 → offline
+            effective_status = updates.get("status", agent.status)
+            if (
+                effective_status in (AgentStatus.WAITING, AgentStatus.WAITING.value)
+                and agent.last_active_at
+                and agent.last_active_at < stale_cutoff
+            ):
+                await repo.update_agent(agent.id, status=AgentStatus.OFFLINE.value)
+                stale_count += 1
+
     if reconciled > 0:
         logger.warning("启动对账: %d 个agent已重置（状态+session清零）", reconciled)
     else:
         logger.info("启动对账: 无需重置")
+    if stale_count > 0:
+        logger.info("启动对账: %d 个过期waiting agent已设为offline", stale_count)
 
 
 async def init_dependencies() -> None:

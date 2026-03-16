@@ -177,19 +177,27 @@ class HookTranslator:
         if cc_agent_id:
             existing = await self.repo.find_agent_by_cc_id(cc_agent_id)
 
-        # 2. session_id + name匹配
+        # 2. 确定目标团队，然后在团队内去重
         if not existing:
-            existing = await self.repo.find_agent_by_session(session_id, agent_name)
-
-        # 3. 团队内同名agent匹配（覆盖MCP预注册、session_id为空等情况）
-        if not existing:
-            # 如果有cc_team_name，优先在对应团队中查找
             if cc_team_name:
+                # 有cc_team_name → 解析目标团队，只在该团队内按name去重
                 team = await self._resolve_cc_team(cc_team_name, session_id)
-            if not team:
-                leader = await self._find_leader(session_id)
-                if leader:
-                    team = await self.repo.find_active_team_by_leader(leader.id)
+                if team:
+                    team_agents = await self.repo.list_agents(team.id)
+                    matches = [a for a in team_agents if a.name == agent_name]
+                    if matches:
+                        existing = matches[0]
+            else:
+                # 无cc_team_name → 旧逻辑兼容：session_id+name全局查找
+                existing = await self.repo.find_agent_by_session(
+                    session_id, agent_name,
+                )
+
+        # 3. 仍未匹配 → 通过Leader找团队，在团队内按name去重
+        if not existing and not team:
+            leader = await self._find_leader(session_id)
+            if leader:
+                team = await self.repo.find_active_team_by_leader(leader.id)
             if team:
                 team_agents = await self.repo.list_agents(team.id)
                 matches = [a for a in team_agents if a.name == agent_name]
