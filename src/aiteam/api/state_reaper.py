@@ -96,6 +96,9 @@ class StateReaper:
         # 检查会议过期
         await self._check_meeting_expiry(now)
 
+        # 检查活跃团队是否应该自动关闭（无活跃agent超过30分钟）
+        await self._check_stale_teams(now)
+
         if reaped_count > 0:
             logger.warning("本轮收割了 %d 个超时agent", reaped_count)
         else:
@@ -176,6 +179,61 @@ class StateReaper:
             },
         )
         return True
+
+    async def _check_stale_teams(self, now: datetime) -> None:
+        """检查活跃团队是否应自动关闭.
+
+        条件：团队内所有agent都是offline/waiting且最后活跃超过30分钟。
+        同时检测CC团队配置文件是否已删除（CC TeamDelete后OS应跟随关闭）。
+        """
+        import os
+        from pathlib import Path
+
+        stale_threshold = now - timedelta(minutes=30)
+        teams_dir = Path.home() / ".claude" / "teams"
+
+        teams = await self._repo.list_teams()
+        for team in teams:
+            if team.status != "active":
+                continue
+
+            agents = await self._repo.list_agents(team.id)
+            if not agents:
+                # 空团队超过30分钟关闭
+                if team.created_at and team.created_at < stale_threshold:
+                    await self._repo.update_team(team.id, status="completed")
+                    logger.info("StateReaper: 关闭空团队 '%s'", team.name)
+                continue
+
+            # 检查是否所有agent都非活跃
+            has_active = False
+            latest_activity = None
+            for agent in agents:
+                if agent.status == "busy":
+                    has_active = True
+                    break
+                if agent.last_active_at:
+                    if latest_activity is None or agent.last_active_at > latest_activity:
+                        latest_activity = agent.last_active_at
+
+            if has_active:
+                continue
+
+            # 所有agent非busy，检查最后活跃时间
+            if latest_activity and latest_activity < stale_threshold:
+                # 额外检查：CC团队配置文件是否还存在
+                cc_team_dir = teams_dir / team.name.lower().replace(" ", "-")
+                cc_config = cc_team_dir / "config.json"
+                if not cc_config.exists():
+                    # CC团队已删除，关闭OS团队
+                    await self._repo.update_team(team.id, status="completed")
+                    for agent in agents:
+                        if agent.status != "offline":
+                            await self._repo.update_agent(agent.id, status="offline")
+                    logger.info(
+                        "StateReaper: CC团队已删除，关闭OS团队 '%s'（%d agents→offline）",
+                        team.name, len(agents),
+                    )
 
     async def _check_meeting_expiry(self, now: datetime) -> None:
         """检查并自动结束超期会议.
