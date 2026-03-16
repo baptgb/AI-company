@@ -65,35 +65,42 @@ def _trim_payload(payload: dict) -> dict:
 
 
 def _resolve_cc_team_name(session_id: str, agent_name: str = "") -> str | None:
-    """通过agent_name和session_id在CC团队配置中查找所属团队名称。
+    """通过agent_name在CC团队配置中查找所属团队名称。
 
-    优先检查members列表匹配agent name（精确），fallback到leadSessionId。
+    策略1: 按members.name精确匹配（不依赖sessionId，跨session可靠）
+    策略2: fallback按leadSessionId匹配
     只使用标准库，静默处理所有异常。
     """
-    if not session_id:
-        return None
     teams_dir = os.path.join(os.path.expanduser("~"), ".claude", "teams")
     try:
         config_files = glob.glob(os.path.join(teams_dir, "*", "config.json"))
     except OSError:
         return None
 
-    session_fallback = None
-    for config_path in config_files:
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-            if config.get("leadSessionId") != session_id:
-                continue
-            # 优先：检查members列表包含此agent（按name匹配）
-            if agent_name:
+    # 策略1：按agent_name在members列表中查找（跨session可靠）
+    if agent_name:
+        for config_path in config_files:
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
                 for m in config.get("members", []):
                     if m.get("name", "") == agent_name:
                         return config.get("name")
-            session_fallback = config.get("name")
-        except (json.JSONDecodeError, OSError, KeyError):
-            continue
-    return session_fallback
+            except (json.JSONDecodeError, OSError, KeyError):
+                continue
+
+    # 策略2：fallback按leadSessionId
+    if session_id:
+        for config_path in config_files:
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                if config.get("leadSessionId") == session_id:
+                    return config.get("name")
+            except (json.JSONDecodeError, OSError, KeyError):
+                continue
+
+    return None
 
 
 def _check_agent_team_name(event_data: dict) -> str | None:
