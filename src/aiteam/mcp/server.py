@@ -441,6 +441,47 @@ def task_decompose(
 
 
 # ============================================================
+# Tool: task_create
+# ============================================================
+
+
+@mcp.tool()
+def task_create(
+    project_id: str,
+    title: str,
+    description: str = "",
+    priority: str = "medium",
+    horizon: str = "mid",
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
+    """在项目中创建新任务（不绑定团队）。
+
+    项目级任务直接挂在项目下，可在项目任务墙中查看。
+    适用于尚未分配团队的规划阶段任务。
+
+    Args:
+        project_id: 项目 ID
+        title: 任务标题
+        description: 任务描述
+        priority: 优先级，可选 "critical" / "high" / "medium" / "low"
+        horizon: 时间跨度，可选 "short" / "mid" / "long"
+        tags: 标签列表
+
+    Returns:
+        创建的任务信息
+    """
+    payload: dict[str, Any] = {
+        "title": title,
+        "description": description,
+        "priority": priority,
+        "horizon": horizon,
+    }
+    if tags:
+        payload["tags"] = tags
+    return _api_call("POST", f"/api/projects/{project_id}/tasks", payload)
+
+
+# ============================================================
 # Tool 12: task_status
 # ============================================================
 

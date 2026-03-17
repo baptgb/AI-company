@@ -75,6 +75,52 @@ async def _run_migrations(db_url: str | None = None) -> None:
 
         # 值迁移: idle → waiting（三状态模型升级）
         await conn.execute(text("UPDATE agents SET status='waiting' WHERE status='idle'"))
+
+        # 迁移: tasks.team_id 从 NOT NULL 改为 nullable（支持项目级任务）
+        team_id_nullable = await conn.run_sync(
+            lambda sync_conn: next(
+                (col["nullable"] for col in inspect(sync_conn).get_columns("tasks")
+                 if col["name"] == "team_id"),
+                True,  # 如果找不到列，跳过
+            ) if inspect(sync_conn).has_table("tasks") else True
+        )
+        if not team_id_nullable:
+            logger.info("迁移: tasks 表 team_id 列改为 nullable（支持项目级任务）")
+            await conn.execute(text(
+                "CREATE TABLE tasks_new AS SELECT * FROM tasks"
+            ))
+            await conn.execute(text("DROP TABLE tasks"))
+            await conn.execute(text("""
+                CREATE TABLE tasks (
+                    id VARCHAR(36) PRIMARY KEY,
+                    team_id VARCHAR(36),
+                    title VARCHAR(500) NOT NULL,
+                    description TEXT DEFAULT '',
+                    status VARCHAR(20) DEFAULT 'pending',
+                    assigned_to VARCHAR(36),
+                    result TEXT,
+                    parent_id VARCHAR(36),
+                    project_id VARCHAR(36),
+                    depends_on JSON DEFAULT '[]',
+                    depth INTEGER DEFAULT 0,
+                    "order" INTEGER DEFAULT 0,
+                    template_id VARCHAR(50),
+                    priority VARCHAR(20) DEFAULT 'medium',
+                    horizon VARCHAR(20) DEFAULT 'short',
+                    tags JSON DEFAULT '[]',
+                    config JSON DEFAULT '{}',
+                    created_at DATETIME,
+                    started_at DATETIME,
+                    completed_at DATETIME
+                )
+            """))
+            await conn.execute(text(
+                "INSERT INTO tasks SELECT * FROM tasks_new"
+            ))
+            await conn.execute(text("DROP TABLE tasks_new"))
+            await conn.execute(text("CREATE INDEX ix_tasks_team_id ON tasks (team_id)"))
+            logger.info("迁移: tasks 表重建完成")
+
         await conn.commit()
 
 

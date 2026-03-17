@@ -161,6 +161,16 @@ class TaskDecompose(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class TaskCreateBody(BaseModel):
+    """项目级任务创建请求."""
+
+    title: str
+    description: str = ""
+    priority: str = "medium"
+    horizon: str = "mid"
+    tags: list[str] = Field(default_factory=list)
+
+
 class IssueReport(BaseModel):
     """上报问题请求."""
 

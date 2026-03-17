@@ -1,4 +1,4 @@
-"""Tests for _check_workflow_reminders in send_event.py.
+"""Tests for workflow_reminder.py.
 
 Tests workflow reminder logic: TeamCreate task reminder, Agent memo reminder,
 shutdown completion reminder, taskwall staleness warning, and cooldowns.
@@ -12,21 +12,21 @@ import time
 from pathlib import Path
 from unittest import mock
 
-# 将hooks目录加入sys.path以便直接导入send_event
+# 将hooks目录加入sys.path以便直接导入workflow_reminder
 _hooks_dir = str(Path(__file__).resolve().parents[2] / "plugin" / "hooks")
 if _hooks_dir not in sys.path:
     sys.path.insert(0, _hooks_dir)
 
-import send_event
-from send_event import _check_workflow_reminders
+import workflow_reminder
+from workflow_reminder import _check_workflow_reminders
 
 
 def _use_temp_state(tmp_path: str):
     """Patch supervisor state file to use a temp directory."""
     state_file = os.path.join(tmp_path, "supervisor-state.json")
     return (
-        mock.patch.object(send_event, "_SUPERVISOR_STATE_FILE", state_file),
-        mock.patch.object(send_event, "_SUPERVISOR_STATE_DIR", tmp_path),
+        mock.patch.object(workflow_reminder, "_SUPERVISOR_STATE_FILE", state_file),
+        mock.patch.object(workflow_reminder, "_SUPERVISOR_STATE_DIR", tmp_path),
     )
 
 

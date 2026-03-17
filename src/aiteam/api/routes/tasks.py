@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from aiteam.api.deps import get_event_bus, get_manager, get_repository
 from aiteam.api.event_bus import EventBus
-from aiteam.api.schemas import APIListResponse, APIResponse, IssueReport, TaskDecompose, TaskRun
+from aiteam.api.exceptions import NotFoundError
+from aiteam.api.schemas import APIListResponse, APIResponse, IssueReport, TaskCreateBody, TaskDecompose, TaskRun
 from aiteam.orchestrator.team_manager import TeamManager
 from aiteam.storage.repository import StorageRepository
 from aiteam.types import Task, TaskStatus
@@ -368,6 +369,37 @@ async def get_subtasks(
             "total": len(subtasks),
         },
     }
+
+
+# ============================================================
+# 项目级任务创建端点
+# ============================================================
+
+
+@router.post(
+    "/api/projects/{project_id}/tasks",
+    status_code=201,
+)
+async def create_project_task(
+    project_id: str,
+    body: TaskCreateBody,
+    repo: StorageRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    """项目级创建任务（不绑定团队）."""
+    project = await repo.get_project(project_id)
+    if not project:
+        raise NotFoundError(f"项目 '{project_id}' 不存在")
+
+    task = await repo.create_task(
+        team_id=None,
+        title=body.title,
+        description=body.description,
+        priority=body.priority,
+        horizon=body.horizon,
+        tags=body.tags,
+        project_id=project_id,
+    )
+    return {"success": True, "data": task.model_dump(mode="json"), "message": "任务已创建"}
 
 
 # ============================================================

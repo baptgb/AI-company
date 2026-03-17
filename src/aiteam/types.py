@@ -236,7 +236,7 @@ class Task(BaseModel):
     """任务数据模型."""
 
     id: str = Field(default_factory=_new_id)
-    team_id: str
+    team_id: str | None = None
     title: str
     description: str = ""
     status: TaskStatus = TaskStatus.PENDING

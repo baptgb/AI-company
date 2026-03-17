@@ -440,14 +440,17 @@ class StorageRepository:
     # ================================================================
 
     async def create_task(
-        self, team_id: str, title: str, description: str = "", **kwargs: object
+        self, team_id: str | None, title: str, description: str = "", **kwargs: object
     ) -> Task:
-        """创建任务."""
+        """创建任务.
+
+        team_id 可为 None（项目级任务，不绑定团队）。
+        """
         # 构建可选参数
         optional: dict[str, object] = {}
-        for key in ("assigned_to", "parent_id", "depends_on", "depth",
-                     "order", "template_id", "priority", "horizon", "tags",
-                     "config"):
+        for key in ("assigned_to", "parent_id", "project_id", "depends_on",
+                     "depth", "order", "template_id", "priority", "horizon",
+                     "tags", "config"):
             if key in kwargs:
                 optional[key] = kwargs[key]
         # 设置默认值
@@ -493,6 +496,19 @@ class StorageRepository:
         """列出团队任务，可按状态过滤."""
         async with get_session(self._db_url) as session:
             stmt = select(TaskModel).where(TaskModel.team_id == team_id)
+            if status is not None:
+                stmt = stmt.where(TaskModel.status == status.value)
+            stmt = stmt.order_by(TaskModel.created_at.desc())
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [r.to_pydantic() for r in rows]
+
+    async def list_tasks_by_project(
+        self, project_id: str, status: TaskStatus | None = None
+    ) -> list[Task]:
+        """列出项目下所有任务（包括team_id=None的项目级任务和团队任务）."""
+        async with get_session(self._db_url) as session:
+            stmt = select(TaskModel).where(TaskModel.project_id == project_id)
             if status is not None:
                 stmt = stmt.where(TaskModel.status == status.value)
             stmt = stmt.order_by(TaskModel.created_at.desc())

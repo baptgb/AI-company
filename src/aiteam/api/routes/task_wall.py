@@ -37,51 +37,51 @@ async def get_project_task_wall(
     priority: str = "",
     repo: StorageRepository = Depends(get_repository),
 ) -> dict[str, Any]:
-    """获取项目级任务墙视图 — 聚合该项目下所有团队的任务.
+    """获取项目级任务墙视图 — 直接按project_id查询所有任务（含team_id=None的项目级任务）.
 
     直接返回 {wall, completed, stats} 结构，与前端 TaskWallResponse 类型对齐。
     """
+    # 直接按project_id查询所有任务，而非按team遍历
+    all_project_tasks = await repo.list_tasks_by_project(project_id)
+
+    # 构建team_name映射（用于有team_id的任务）
     teams = await repo.list_teams_by_project(project_id)
     team_name_map: dict[str, str] = {t.id: t.name for t in teams}
 
     now = datetime.now()
     wall: dict[str, list[dict]] = {"short": [], "mid": [], "long": []}
     completed_tasks: list[dict] = []
-    all_tasks_count = 0
+    all_tasks_count = len(all_project_tasks)
     by_status: dict[str, int] = {}
     by_priority: dict[str, int] = {}
     scores: list[float] = []
 
-    for team in teams:
-        tasks = await repo.list_tasks(team.id)
-        all_tasks_count += len(tasks)
+    for task in all_project_tasks:
+        s = task.status if isinstance(task.status, str) else task.status.value
+        by_status[s] = by_status.get(s, 0) + 1
 
-        for task in tasks:
-            s = task.status if isinstance(task.status, str) else task.status.value
-            by_status[s] = by_status.get(s, 0) + 1
+        p = task.priority if isinstance(task.priority, str) else task.priority.value
+        by_priority[p] = by_priority.get(p, 0) + 1
 
-            p = task.priority if isinstance(task.priority, str) else task.priority.value
-            by_priority[p] = by_priority.get(p, 0) + 1
+        item = task.model_dump(mode="json")
+        item["team_name"] = team_name_map.get(task.team_id, "") if task.team_id else ""
 
-            item = task.model_dump(mode="json")
-            item["team_name"] = team_name_map.get(task.team_id, "")
+        if s == "completed":
+            completed_tasks.append(item)
+            continue
 
-            if s == "completed":
-                completed_tasks.append(item)
-                continue
+        h = task.horizon if isinstance(task.horizon, str) else task.horizon.value
+        if horizon and h != horizon:
+            continue
+        if priority and p not in priority.split(","):
+            continue
 
-            h = task.horizon if isinstance(task.horizon, str) else task.horizon.value
-            if horizon and h != horizon:
-                continue
-            if priority and p not in priority.split(","):
-                continue
+        score = calculate_task_score(task, now)
+        item["score"] = round(score, 1)
+        scores.append(score)
 
-            score = calculate_task_score(task, now)
-            item["score"] = round(score, 1)
-            scores.append(score)
-
-            if h in wall:
-                wall[h].append(item)
+        if h in wall:
+            wall[h].append(item)
 
     # 每组内按score降序
     for key in wall:
