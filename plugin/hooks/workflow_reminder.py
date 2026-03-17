@@ -176,7 +176,28 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                 "→ 建议更新任务状态并添加总结memo (task_memo_add type=summary)"
             )
 
-    # 4. 距上次查看任务墙超过15分钟
+    # 4. TeamDelete时通知OS关闭对应团队
+    if tool_name == "TeamDelete":
+        try:
+            import urllib.request
+            api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
+            # 关闭所有active团队（TeamDelete意味着当前团队工作结束）
+            req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                teams = json.loads(resp.read().decode("utf-8")).get("data", [])
+            for t in teams:
+                if t.get("status") == "active":
+                    close_req = urllib.request.Request(
+                        f"{api_url}/api/teams/{t['id']}",
+                        data=json.dumps({"status": "completed"}).encode(),
+                        headers={"Content-Type": "application/json"},
+                        method="PUT",
+                    )
+                    urllib.request.urlopen(close_req, timeout=2)
+        except Exception:
+            pass  # 静默处理
+
+    # 5. 距上次查看任务墙超过15分钟
     if tool_name in ("taskwall_view", "mcp__ai-team-os__taskwall_view"):
         state["last_taskwall_view"] = now
     else:
@@ -233,7 +254,7 @@ def main() -> None:
     _save_supervisor_state(state)
 
     for w in warnings:
-        print(w)
+        sys.stderr.write(w + "\n")
 
 
 if __name__ == "__main__":
