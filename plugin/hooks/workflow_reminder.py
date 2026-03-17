@@ -253,8 +253,14 @@ def main() -> None:
 
     _save_supervisor_state(state)
 
-    for w in warnings:
-        sys.stderr.write(w + "\n")
+    if warnings:
+        # PreToolUse hooks通过hookSpecificOutput.additionalContext注入文本到对话
+        output = {
+            "hookSpecificOutput": {
+                "additionalContext": "\n".join(warnings)
+            }
+        }
+        sys.stdout.write(json.dumps(output))
 
 
 if __name__ == "__main__":
