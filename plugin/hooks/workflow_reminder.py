@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
 
 _SUPERVISOR_STATE_DIR = os.path.join(
     os.path.expanduser("~"), ".claude", "data", "ai-team-os"
@@ -18,8 +19,8 @@ _SUPERVISOR_STATE_FILE = os.path.join(_SUPERVISOR_STATE_DIR, "supervisor-state.j
 # Leader委派检查的阈值
 _LEADER_CONSECUTIVE_THRESHOLD = 8
 
-# TeamCreate后等待Agent调用的阈值
-_TEAM_WITHOUT_MEMBERS_THRESHOLD = 3
+# TeamCreate后等待常驻成员的工具调用阈值
+_TEAM_WITHOUT_MEMBERS_THRESHOLD = 5
 
 # 视为"委派"动作的工具名（调用这些工具会重置计数器）
 _DELEGATION_TOOLS = {"Agent", "TeamCreate", "SendMessage"}
@@ -107,14 +108,35 @@ def _check_leader_doing_too_much(event_data: dict, state: dict) -> str | None:
     return None
 
 
+def _team_has_required_roles(team_name: str) -> bool:
+    """检查团队config中是否已有QA和bug-fixer角色。"""
+    import json as _json
+    config_path = Path.home() / ".claude" / "teams" / team_name / "config.json"
+    if not config_path.exists():
+        return False
+    try:
+        data = _json.loads(config_path.read_text(encoding="utf-8"))
+        members = data.get("members", [])
+        names = [m.get("name", "").lower() for m in members]
+        has_qa = any("qa" in n for n in names)
+        has_fixer = any("bug-fixer" in n or "fixer" in n for n in names)
+        return has_qa and has_fixer
+    except Exception:
+        return False
+
+
 def _check_team_has_permanent_members(event_data: dict, state: dict) -> str | None:
-    """检查TeamCreate后是否及时添加常驻成员。"""
+    """检查TeamCreate后是否及时添加常驻成员（QA+bug-fixer）。"""
     tool_name = event_data.get("tool_name", "")
     event_name = event_data.get("hook_event_name", "")
 
     if event_name == "PostToolUse" and tool_name == "TeamCreate":
         state["team_created_waiting"] = True
         state["calls_since_team_create"] = 0
+        # 记录团队名
+        tool_input = event_data.get("tool_input", {})
+        if isinstance(tool_input, dict):
+            state["last_team_name"] = tool_input.get("team_name", "")
         return None
 
     if not state.get("team_created_waiting", False):
@@ -123,7 +145,9 @@ def _check_team_has_permanent_members(event_data: dict, state: dict) -> str | No
     if event_name != "PreToolUse":
         return None
 
-    if tool_name == "Agent":
+    # 检查团队config中是否已有QA和bug-fixer（而非仅检查是否调用了Agent）
+    team_name = state.get("last_team_name", "")
+    if team_name and _team_has_required_roles(team_name):
         state["team_created_waiting"] = False
         state["calls_since_team_create"] = 0
         return None
@@ -132,7 +156,7 @@ def _check_team_has_permanent_members(event_data: dict, state: dict) -> str | No
     state["calls_since_team_create"] = calls_since
 
     if calls_since >= _TEAM_WITHOUT_MEMBERS_THRESHOLD:
-        state["team_created_waiting"] = False
+        # 每次触发后重置计数但保持waiting，持续提醒直到创建常驻成员
         state["calls_since_team_create"] = 0
         return (
             "[AI Team OS] B0.10提醒：团队已创建但尚未添加常驻成员（QA+bug-fixer）。"
@@ -197,7 +221,55 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
         except Exception:
             pass  # 静默处理
 
-    # 5. 距上次查看任务墙超过15分钟
+    # 5. TeamCreate后检查是否已有active团队
+    if tool_name == "TeamCreate":
+        try:
+            import urllib.request
+            api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
+            req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                teams = json.loads(resp.read().decode("utf-8")).get("data", [])
+            active_teams = [t for t in teams if t.get("status") == "active"]
+            # 新创建的团队也会是active，所以检查是否有>1个active团队
+            if len(active_teams) > 1:
+                other = active_teams[0].get("name", "未知")
+                warnings.append(
+                    f"[OS提醒] 已存在活跃团队「{other}」。"
+                    "建议：①在已有团队中添加成员 ②先关闭旧团队再创建新的"
+                )
+        except Exception:
+            pass  # API不可用时静默跳过
+
+    # 6. SendMessage后检查并行任务分配情况
+    if tool_name == "SendMessage":
+        try:
+            import urllib.request
+            api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
+            req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                teams = json.loads(resp.read().decode("utf-8")).get("data", [])
+            active_teams = [t for t in teams if t.get("status") == "active"]
+            if active_teams:
+                team_id = active_teams[0].get("id", "")
+                if team_id:
+                    req2 = urllib.request.Request(
+                        f"{api_url}/api/teams/{team_id}/agents", method="GET",
+                    )
+                    with urllib.request.urlopen(req2, timeout=2) as resp2:
+                        agents = json.loads(resp2.read().decode("utf-8")).get("data", [])
+                    busy_count = sum(
+                        1 for a in agents
+                        if a.get("status") == "busy" and a.get("role") != "leader"
+                    )
+                    if busy_count < 3:
+                        warnings.append(
+                            f"[OS提醒] 当前仅{busy_count}个成员在工作。"
+                            "可以并行分配更多任务给空闲成员，提高效率"
+                        )
+        except Exception:
+            pass  # API不可用时静默跳过
+
+    # 7. 距上次查看任务墙超过15分钟
     if tool_name in ("taskwall_view", "mcp__ai-team-os__taskwall_view"):
         state["last_taskwall_view"] = now
     else:
