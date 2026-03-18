@@ -1000,6 +1000,9 @@ class HookTranslator:
                 all_agents = await self.repo.list_agents(team.id)
                 for agent in all_agents:
                     if agent.status == "busy" and agent.source == "hook":
+                        # 跳过最近30秒创建的agent（防旧Stop覆盖新agent）
+                        if agent.created_at and agent.created_at > recent_cutoff:
+                            continue
                         # 只清理最近活跃的或没有活跃记录的agent
                         if agent.last_active_at and agent.last_active_at < cutoff:
                             continue  # 超出时间窗口，跳过（可能属于其他session）
