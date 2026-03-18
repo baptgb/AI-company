@@ -235,6 +235,13 @@ _ADVISORY_RULES: list[dict] = [
         "advice": "每个任务至少3条memo：开始时记录计划、中间记录进展、结束时记录总结",
     },
     {
+        "id": "B0.13",
+        "category": "agent",
+        "name": "Agent标准化汇报模板",
+        "description": "Agent完成任务后应使用标准化格式汇报：完成内容+修改文件+测试结果+建议任务状态+建议memo",
+        "advice": "创建Agent时通过system_prompt注入汇报规范。如果Leader手动指定了system_prompt则不覆盖",
+    },
+    {
         "id": "B1",
         "category": "coordination",
         "name": "文件驱动协调",

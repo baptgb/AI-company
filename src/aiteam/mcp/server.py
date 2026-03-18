@@ -175,6 +175,29 @@ def team_list() -> dict[str, Any]:
 # ============================================================
 
 
+def _load_agent_prompt_template() -> str:
+    """加载Agent标准化prompt模板."""
+    # server.py位于 src/aiteam/mcp/server.py，需往上4层到项目根目录
+    template_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "plugin", "config", "agent-prompt-template.md",
+    )
+    try:
+        with open(template_path, encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        logger.warning("Agent prompt模板文件不存在: %s", template_path)
+        return ""
+
+
+def _render_agent_prompt(role: str, project_path: str = "") -> str:
+    """用基本信息填充模板."""
+    template = _load_agent_prompt_template()
+    if not template:
+        return ""
+    return template.replace("{role}", role).replace("{project_path}", project_path or "未指定")
+
+
 @mcp.tool()
 def agent_register(
     team_id: str,
@@ -189,21 +212,29 @@ def agent_register(
     规则：一次性任务完成后Leader应Kill该Agent，可能有后续任务的保留。
     工具受限时报告Leader解决。
 
+    如果未提供system_prompt，自动使用标准化prompt模板填充。
+
     Args:
         team_id: 目标团队 ID 或名称
         name: Agent 名称
         role: Agent 角色描述
         model: 使用的模型，默认 claude-opus-4-6
-        system_prompt: Agent 的系统提示词
+        system_prompt: Agent 的系统提示词（留空则自动使用标准化模板）
 
     Returns:
         Agent 信息 + teammates 列表 + team_snapshot（含 pending_tasks 和 recent_meeting）
     """
+    effective_prompt = system_prompt
+    if not effective_prompt:
+        # MCP层无法直接查询project的root_path，模板中{project_path}显示"未指定"
+        # hook_translator的auto-register路径可以获取到准确的project_path
+        effective_prompt = _render_agent_prompt(role)
+
     return _api_call("POST", f"/api/teams/{team_id}/agents", {
         "name": name,
         "role": role,
         "model": model,
-        "system_prompt": system_prompt,
+        "system_prompt": effective_prompt,
     })
 
 
