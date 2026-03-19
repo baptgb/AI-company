@@ -209,11 +209,13 @@ function ActiveTeamContent({ team }: { team: Team }) {
         )}
 
         {/* 活动追踪 */}
-        {activities.length > 0 && (
-          <div className="mt-4 border-t pt-4">
-            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-              <History className="h-4 w-4" /> 活动追踪（最近{activities.length}条）
-            </h4>
+        <div className="mt-4 border-t pt-4">
+          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+            <History className="h-4 w-4" /> 活动追踪
+          </h4>
+          {activities.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-3 text-center">暂无活动记录（Agent开始工作后自动显示）</p>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -240,8 +242,8 @@ function ActiveTeamContent({ team }: { team: Team }) {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
 
       {/* Add Agent Dialog */}
