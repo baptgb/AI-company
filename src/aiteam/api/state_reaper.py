@@ -96,6 +96,9 @@ class StateReaper:
         # 检查会议过期
         await self._check_meeting_expiry(now)
 
+        # 立即检测CC已删除的团队（不等30分钟）
+        await self._check_team_liveness()
+
         # 检查活跃团队是否应该自动关闭（无活跃agent超过30分钟）
         await self._check_stale_teams(now)
 
@@ -184,6 +187,59 @@ class StateReaper:
             },
         )
         return True
+
+    async def _check_team_liveness(self) -> None:
+        """立即检测CC已删除的团队并同步关闭OS团队.
+
+        与_check_stale_teams不同，此方法不等30分钟超时，只要CC config消失就立即关闭。
+        适用于用户主动执行TeamDelete后OS快速同步的场景。
+        """
+        from pathlib import Path
+        import json as _json
+
+        teams_dir = Path.home() / ".claude" / "teams"
+        if not teams_dir.exists():
+            return
+
+        # 收集CC中所有存在的团队目录名（用于匹配）
+        existing_cc_dirs: set[str] = set()
+        for entry in teams_dir.iterdir():
+            if entry.is_dir() and (entry / "config.json").exists():
+                existing_cc_dirs.add(entry.name)
+
+        teams = await self._repo.list_teams()
+        for team in teams:
+            if team.status != "active":
+                continue
+
+            # 将OS团队名转换为CC目录名（与_check_stale_teams保持一致）
+            cc_dir_name = team.name.lower().replace(" ", "-")
+            if cc_dir_name in existing_cc_dirs:
+                continue  # CC团队仍存活，跳过
+
+            # CC团队config不存在 → 立即关闭OS团队
+            agents = await self._repo.list_agents(team.id)
+            await self._repo.update_team(team.id, status="completed")
+            for agent in agents:
+                if agent.status != "offline":
+                    await self._repo.update_agent(
+                        agent.id, status="offline", current_task=None,
+                    )
+            await self._event_bus.emit(
+                "team.status_changed",
+                f"team:{team.id}",
+                {
+                    "team_id": team.id,
+                    "name": team.name,
+                    "status": "completed",
+                    "trigger": "team_liveness",
+                    "agents_offline": len(agents),
+                },
+            )
+            logger.info(
+                "Config探测: CC团队 '%s' 已删除，OS团队设为completed（%d agents→offline）",
+                team.name, len(agents),
+            )
 
     async def _check_stale_teams(self, now: datetime) -> None:
         """检查活跃团队是否应自动关闭.
