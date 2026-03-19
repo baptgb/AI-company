@@ -243,7 +243,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
         except Exception:
             pass  # API不可用时静默跳过
 
-    # 6. SendMessage后检查并行任务分配情况
+    # 6. SendMessage后检查并行任务分配情况（含空闲Agent+pending任务匹配建议）
     if tool_name == "SendMessage":
         try:
             import urllib.request
@@ -260,15 +260,60 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                     )
                     with urllib.request.urlopen(req2, timeout=2) as resp2:
                         agents = json.loads(resp2.read().decode("utf-8")).get("data", [])
-                    busy_count = sum(
-                        1 for a in agents
-                        if a.get("status") == "busy" and a.get("role") != "leader"
-                    )
-                    if busy_count < 3:
-                        warnings.append(
-                            f"[OS提醒] 当前仅{busy_count}个成员在工作。"
-                            "可以并行分配更多任务给空闲成员，提高效率"
-                        )
+                    non_leader_agents = [a for a in agents if a.get("role") != "leader"]
+                    busy_count = sum(1 for a in non_leader_agents if a.get("status") == "busy")
+                    idle_agents = [
+                        a for a in non_leader_agents
+                        if a.get("status") in ("waiting", "offline")
+                    ]
+                    if busy_count < 3 and idle_agents:
+                        # 尝试获取pending任务做匹配建议
+                        match_hints: list[str] = []
+                        try:
+                            req3 = urllib.request.Request(
+                                f"{api_url}/api/teams/{team_id}/tasks", method="GET",
+                            )
+                            with urllib.request.urlopen(req3, timeout=2) as resp3:
+                                tasks = json.loads(resp3.read().decode("utf-8")).get("data", [])
+                            pending_tasks = [
+                                t for t in tasks
+                                if t.get("status") in ("pending",) and not t.get("assigned_to")
+                            ]
+                            for idle in idle_agents[:3]:  # 最多显示3个空闲Agent
+                                agent_role = (idle.get("role") or idle.get("name") or "").lower()
+                                agent_name = idle.get("name", "?")
+                                # 找tags与agent role有交集的任务
+                                matched = next(
+                                    (
+                                        t for t in pending_tasks
+                                        if any(
+                                            tag.lower() in agent_role or agent_role in tag.lower()
+                                            for tag in (t.get("tags") or [])
+                                        )
+                                    ),
+                                    pending_tasks[0] if pending_tasks else None,
+                                )
+                                if matched:
+                                    tags_str = ",".join(matched.get("tags") or [])
+                                    hint = (
+                                        f"空闲Agent: {agent_name}({idle.get('role','')}), "
+                                        f"待办: {matched['title']}"
+                                        + (f"(tags:{tags_str})" if tags_str else "")
+                                        + " → 建议分配"
+                                    )
+                                    match_hints.append(hint)
+                        except Exception:
+                            pass
+                        if match_hints:
+                            warnings.append(
+                                f"[OS提醒] 当前仅{busy_count}个成员在工作，有空闲Agent可并行分配：\n"
+                                + "\n".join(f"  • {h}" for h in match_hints)
+                            )
+                        else:
+                            warnings.append(
+                                f"[OS提醒] 当前仅{busy_count}个成员在工作。"
+                                "可以并行分配更多任务给空闲成员，提高效率"
+                            )
         except Exception:
             pass  # API不可用时静默跳过
 
@@ -284,6 +329,45 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                 "→ 建议 taskwall_view 查看当前任务状态"
             )
             state["last_taskwall_view"] = now
+
+    # 9. Handoff提醒：Agent汇报完成时，提醒分配后续任务
+    if tool_name == "SendMessage":
+        input_str = str(event_data.get("tool_input", {}))
+        completion_keywords = ["完成", "completed", "done", "finished", "汇报"]
+        is_completion = any(kw in input_str.lower() for kw in completion_keywords)
+        # 排除shutdown消息（规则3已处理）
+        is_shutdown = "shutdown" in input_str.lower()
+        if is_completion and not is_shutdown:
+            try:
+                import urllib.request
+                api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
+                req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
+                with urllib.request.urlopen(req, timeout=2) as resp:
+                    teams = json.loads(resp.read().decode("utf-8")).get("data", [])
+                active_teams = [t for t in teams if t.get("status") == "active"]
+                if active_teams:
+                    team_id = active_teams[0].get("id", "")
+                    if team_id:
+                        req2 = urllib.request.Request(
+                            f"{api_url}/api/teams/{team_id}/tasks", method="GET",
+                        )
+                        with urllib.request.urlopen(req2, timeout=2) as resp2:
+                            tasks = json.loads(resp2.read().decode("utf-8")).get("data", [])
+                        pending = [
+                            t for t in tasks
+                            if t.get("status") == "pending" and not t.get("assigned_to")
+                        ]
+                        if pending:
+                            pending_titles = "、".join(
+                                t["title"] for t in pending[:3]
+                            )
+                            more = f"等{len(pending)}个" if len(pending) > 3 else ""
+                            warnings.append(
+                                f"[OS提醒] Agent已完成汇报，仍有待分配任务：{pending_titles}{more}。"
+                                "→ 是否分配给空闲成员继续推进？"
+                            )
+            except Exception:
+                pass
 
     # ── 安全护栏规则 ──────────────────────────────────────────
 

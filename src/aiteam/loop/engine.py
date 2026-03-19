@@ -336,6 +336,16 @@ class LoopEngine:
         except Exception:
             logger.warning("保存回顾记忆失败: team=%s", team_id)
 
+        # 6. 自动执行反思和经验提取
+        try:
+            await self.reflect(team_id, completed, failed, state.current_cycle)
+        except Exception:
+            logger.warning("reflect执行失败: team=%s", team_id)
+        try:
+            await self.enrich(team_id, completed, failed)
+        except Exception:
+            logger.warning("enrich执行失败: team=%s", team_id)
+
         logger.info("Review started: team=%s, meeting=%s", team_id, meeting.id)
 
         return {
@@ -403,3 +413,116 @@ class LoopEngine:
             stats["by_status"][s] = stats["by_status"].get(s, 0) + 1
 
         return {"wall": wall, "completed": completed_tasks, "stats": stats}
+
+    async def reflect(
+        self,
+        team_id: str,
+        completed: list[Task],
+        failed: list[Task],
+        cycle: int,
+    ) -> dict[str, Any]:
+        """分析本cycle执行数据，生成反思报告保存到memory.
+
+        统计内容：完成/失败任务数、平均耗时、高产出Agent。
+        """
+        # 计算平均耗时（仅对有started_at和completed_at的任务）
+        durations: list[float] = []
+        for t in completed:
+            if t.started_at and t.completed_at:
+                elapsed = (t.completed_at - t.started_at).total_seconds() / 60
+                durations.append(elapsed)
+        avg_duration = sum(durations) / len(durations) if durations else 0.0
+
+        # 统计高产出Agent（按assigned_to分组计数）
+        agent_output: dict[str, int] = {}
+        for t in completed:
+            if t.assigned_to:
+                agent_output[t.assigned_to] = agent_output.get(t.assigned_to, 0) + 1
+
+        top_agents = sorted(agent_output.items(), key=lambda x: x[1], reverse=True)[:3]
+
+        # 生成反思报告
+        lines = [
+            f"# 循环反思报告 — 第 {cycle} 周期",
+            "",
+            f"- 已完成任务: {len(completed)}",
+            f"- 失败任务: {len(failed)}",
+            f"- 平均任务耗时: {avg_duration:.1f} 分钟" if avg_duration else "- 平均任务耗时: 暂无数据",
+        ]
+        if top_agents:
+            lines.append("- 高产出Agent:")
+            for agent_id, count in top_agents:
+                lines.append(f"  - {agent_id}: {count} 个任务")
+
+        report = "\n".join(lines)
+
+        try:
+            await self._repo.create_memory(
+                scope="team",
+                scope_id=team_id,
+                content=report,
+                metadata={"type": "reflect", "cycle": cycle},
+            )
+        except Exception:
+            logger.warning("保存反思记忆失败: team=%s", team_id)
+
+        logger.info("reflect完成: team=%s, cycle=%d, completed=%d, failed=%d",
+                    team_id, cycle, len(completed), len(failed))
+        return {
+            "completed": len(completed),
+            "failed": len(failed),
+            "avg_duration_minutes": round(avg_duration, 1),
+            "top_agents": [{"agent_id": a, "count": c} for a, c in top_agents],
+        }
+
+    async def enrich(
+        self,
+        team_id: str,
+        completed: list[Task],
+        failed: list[Task],
+    ) -> dict[str, Any]:
+        """提取经验教训，保存为team memory（type=lesson_learned）.
+
+        从failed任务提取失败原因，从成功模式提取可复用经验。
+        """
+        lessons: list[str] = []
+
+        # 从失败任务提取失败原因
+        for t in failed:
+            reason = ""
+            if t.result:
+                reason = t.result[:200]
+            elif t.config.get("error"):
+                reason = str(t.config["error"])[:200]
+            title = t.title or t.description[:60]
+            if reason:
+                lessons.append(f"[失败教训] 任务「{title}」失败原因：{reason}")
+            else:
+                lessons.append(f"[失败教训] 任务「{title}」失败，原因未记录")
+
+        # 从成功任务提取可复用模式（有tags的任务）
+        tag_success: dict[str, int] = {}
+        for t in completed:
+            for tag in (t.tags or []):
+                tag_success[tag] = tag_success.get(tag, 0) + 1
+        for tag, count in tag_success.items():
+            if count >= 2:
+                lessons.append(f"[成功模式] 标签「{tag}」的任务本轮完成{count}个，此类任务执行顺畅")
+
+        if not lessons:
+            lessons.append("本周期暂无明显失败教训或可复用经验")
+
+        content = "\n".join(lessons)
+
+        try:
+            await self._repo.create_memory(
+                scope="team",
+                scope_id=team_id,
+                content=content,
+                metadata={"type": "lesson_learned"},
+            )
+        except Exception:
+            logger.warning("保存经验教训记忆失败: team=%s", team_id)
+
+        logger.info("enrich完成: team=%s, lessons=%d", team_id, len(lessons))
+        return {"lessons": lessons}

@@ -114,6 +114,69 @@ class WatchdogChecker:
 
         return recovered
 
+    async def recover_failed_tasks(
+        self, team_id: str, event_bus: "EventBus | None" = None,
+    ) -> list[dict[str, Any]]:
+        """Selector模式失败任务恢复.
+
+        retry_count < 2 → 重置为pending重试
+        retry_count >= 2 → 保持failed，发出告警事件
+        retry_count 存储在 task.config["retry_count"] 中。
+        """
+        results: list[dict[str, Any]] = []
+        failed_tasks = await self._repo.list_tasks(team_id, status=TaskStatus.FAILED)
+
+        for task in failed_tasks:
+            retry_count: int = int(task.config.get("retry_count", 0))
+            title = task.title or task.description[:60]
+
+            if retry_count < 2:
+                # 重试：重置为pending，retry_count+1
+                new_config = {**task.config, "retry_count": retry_count + 1}
+                await self._repo.update_task(
+                    task.id,
+                    status=TaskStatus.PENDING.value,
+                    assigned_to=None,
+                    config=new_config,
+                )
+                record: dict[str, Any] = {
+                    "task_id": task.id,
+                    "title": title,
+                    "action": "retried",
+                    "retry_count": retry_count + 1,
+                }
+                results.append(record)
+                logger.info(
+                    "失败任务重试: '%s' (retry=%d)", title, retry_count + 1,
+                )
+            else:
+                # 超过重试上限：发出告警事件
+                record = {
+                    "task_id": task.id,
+                    "title": title,
+                    "action": "max_retries_exceeded",
+                    "retry_count": retry_count,
+                }
+                results.append(record)
+                if event_bus is not None:
+                    await event_bus.emit(
+                        "watchdog.task_failed_permanently",
+                        f"task:{task.id}",
+                        {
+                            "task_id": task.id,
+                            "title": title,
+                            "team_id": team_id,
+                            "retry_count": retry_count,
+                            "trigger": "recover_failed_tasks",
+                        },
+                    )
+                logger.warning(
+                    "失败任务超过重试上限: '%s' (retry=%d)，需Leader介入",
+                    title, retry_count,
+                )
+
+        return results
+
     async def check_agent_health(self, team_id: str) -> list[dict[str, Any]]:
         """检查Agent健康：BUSY超时(>30min)、频繁crash."""
         alerts: list[dict[str, Any]] = []
@@ -294,6 +357,18 @@ class WatchdogRunner:
                     f"team:{team.id}",
                     record,
                 )
+
+            # 失败任务重试/告警
+            failed_results = await self._checker.recover_failed_tasks(
+                team.id, event_bus=self._event_bus,
+            )
+            for record in failed_results:
+                if record.get("action") == "retried":
+                    await self._event_bus.emit(
+                        "watchdog.task_retried",
+                        f"team:{team.id}",
+                        record,
+                    )
 
             alerts = await self._checker.run_all_checks(team.id)
             for alert in alerts:
