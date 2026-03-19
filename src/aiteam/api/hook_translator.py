@@ -993,7 +993,8 @@ class HookTranslator:
         session_id = payload.get("session_id", "")
         updated: list[str] = []
 
-        # 方式1: 按session_id查找 → 设为waiting（agent完成一轮，可能还有后续）
+        # 方式1: 按session_id查找 → 只更新last_active_at，不改状态
+        # 状态变更由StateReaper的config_liveness检测负责
         recent_cutoff = datetime.now() - timedelta(seconds=30)
         agents = await self.repo.find_agents_by_session(session_id)
         for agent in agents:
@@ -1001,12 +1002,7 @@ class HookTranslator:
                 if agent.created_at and agent.created_at > recent_cutoff:
                     continue  # 刚创建的agent，跳过防旧Stop覆盖
                 await self.repo.update_agent(
-                    agent.id, status="waiting", last_active_at=datetime.now(),
-                )
-                await self.event_bus.emit(
-                    "agent.status_changed",
-                    f"agent:{agent.id}",
-                    {"agent_id": agent.id, "name": agent.name, "status": "waiting", "trigger": "stop_idle"},
+                    agent.id, last_active_at=datetime.now(),
                 )
                 updated.append(agent.id)
 

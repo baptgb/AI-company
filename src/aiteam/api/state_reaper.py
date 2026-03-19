@@ -104,6 +104,7 @@ class StateReaper:
         else:
             logger.debug("收割周期完成，无超时agent")
 
+        await self._check_agent_liveness()
         await self._check_loop_auto_advance()
 
     async def _check_hook_agent(self, agent, now: datetime) -> bool:
@@ -286,6 +287,63 @@ class StateReaper:
 
             except Exception:
                 logger.exception("Loop自动推进失败: team=%s, phase=%s", team.id, phase)
+
+    async def _check_agent_liveness(self) -> None:
+        """基于CC team config检测agent存活状态."""
+        from pathlib import Path
+        import json as _json
+
+        teams_dir = Path.home() / ".claude" / "teams"
+        if not teams_dir.exists():
+            return
+
+        # 1. 收集所有CC team config中的活跃成员名
+        alive_names: set[str] = set()
+        for team_dir in teams_dir.iterdir():
+            if not team_dir.is_dir():
+                continue
+            config_path = team_dir / "config.json"
+            if not config_path.exists():
+                continue
+            try:
+                data = _json.loads(config_path.read_text(encoding="utf-8"))
+                for member in data.get("members", []):
+                    name = member.get("name", "")
+                    if name:
+                        alive_names.add(name)
+            except Exception:
+                continue
+
+        # 2. 检查OS中busy/waiting的hook agents是否还存活
+        teams = await self._repo.list_teams()
+        for team in teams:
+            if team.status != "active":
+                continue
+            agents = await self._repo.list_agents(team.id)
+            for agent in agents:
+                if agent.source != "hook" or agent.status == "offline":
+                    continue
+                # team-lead由SessionStart/SessionEnd管理，跳过
+                if agent.name == "team-lead":
+                    continue
+                # busy或waiting的agent如果不在任何team config中 → offline
+                if agent.name not in alive_names:
+                    await self._repo.update_agent(
+                        agent.id, status=AgentStatus.OFFLINE.value, current_task=None,
+                    )
+                    await self._event_bus.emit(
+                        "agent.status_changed",
+                        f"agent:{agent.id}",
+                        {
+                            "agent_id": agent.id,
+                            "name": agent.name,
+                            "status": "offline",
+                            "trigger": "config_liveness",
+                        },
+                    )
+                    logger.info(
+                        "Config探测: %s 不在CC team members中 → offline", agent.name,
+                    )
 
     async def _check_meeting_expiry(self, now: datetime) -> None:
         """检查并自动结束超期会议.
