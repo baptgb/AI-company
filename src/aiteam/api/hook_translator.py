@@ -138,6 +138,9 @@ class HookTranslator:
         self.event_bus = event_bus
         self._file_tracker = _FileEditTracker()
         self._prompt_template: str | None = None
+        # pending_spans: key = "{agent_id}:{session_id}:{tool_name}"
+        # value = (activity_id, start_time)
+        self._pending_spans: dict[str, tuple[str, datetime]] = {}
 
     def _load_prompt_template(self) -> str:
         """懒加载Agent标准化prompt模板."""
@@ -719,12 +722,17 @@ class HookTranslator:
                 target_agent.id, last_active_at=datetime.now(),
             )
 
-            await self.repo.create_activity(
+            start_time = datetime.now()
+            activity = await self.repo.create_activity(
                 agent_id=target_agent.id,
                 session_id=session_id,
                 tool_name=tool_name,
                 input_summary=input_summary,
+                status="running",
             )
+            # 记录 pending span 供 PostToolUse 关联
+            span_key = f"{target_agent.id}:{session_id}:{tool_name}"
+            self._pending_spans[span_key] = (activity.id, start_time)
             # current_task由Leader通过API设定，hook不自动覆盖
 
             # 文件编辑冲突检测（仅记录事件，不阻止操作）
@@ -783,17 +791,32 @@ class HookTranslator:
             await self._self_heal_agent(target_agent, trigger="self_heal_post")
 
             # 更新最后活跃时间
-            await self.repo.update_agent(
-                target_agent.id, last_active_at=datetime.now(),
-            )
+            now = datetime.now()
+            await self.repo.update_agent(target_agent.id, last_active_at=now)
 
-            await self.repo.create_activity(
-                agent_id=target_agent.id,
-                session_id=session_id,
-                tool_name=tool_name,
-                input_summary=input_summary,
-                output_summary=output_summary,
-            )
+            # 尝试关联 PreToolUse 创建的 running activity
+            span_key = f"{target_agent.id}:{session_id}:{tool_name}"
+            pending = self._pending_spans.pop(span_key, None)
+
+            if pending:
+                activity_id, start_time = pending
+                duration_ms = int((now - start_time).total_seconds() * 1000)
+                await self.repo.update_activity(
+                    activity_id,
+                    status="completed",
+                    output_summary=output_summary,
+                    duration_ms=duration_ms,
+                )
+            else:
+                # 向后兼容：找不到 pending span 则创建新的 completed 记录
+                await self.repo.create_activity(
+                    agent_id=target_agent.id,
+                    session_id=session_id,
+                    tool_name=tool_name,
+                    input_summary=input_summary,
+                    output_summary=output_summary,
+                    status="completed",
+                )
 
         await self.event_bus.emit(
             "cc.tool_complete",

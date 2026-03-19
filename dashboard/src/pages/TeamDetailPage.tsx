@@ -45,8 +45,10 @@ import { useTeam, useTeamStatus } from '@/api/teams';
 import { useAgents, useCreateAgent, useDeleteAgent } from '@/api/agents';
 import { useRunTask } from '@/api/tasks';
 import { useCreateMeeting } from '@/api/meetings';
+import { useTeamActivities } from '@/api/activities';
 import { LiveIndicator } from '@/components/shared/LiveIndicator';
-import { ActivityLog } from '@/components/agents/ActivityLog';
+import { ActivityLog, StatusIcon, formatDuration } from '@/components/agents/ActivityLog';
+import { Activity } from 'lucide-react';
 
 function StatusBadge({ status }: { status: string }) {
   const variant =
@@ -99,6 +101,7 @@ export function TeamDetailPage() {
   const { data: teamData, isLoading: teamLoading, error: teamError } = useTeam(teamId ?? '');
   const { data: statusData, isLoading: statusLoading } = useTeamStatus(teamId ?? '');
   const { data: agentsData, isLoading: agentsLoading } = useAgents(teamId ?? '');
+  const { data: activitiesData, isLoading: activitiesLoading } = useTeamActivities(teamId ?? '');
 
   const createAgent = useCreateAgent();
   const deleteAgent = useDeleteAgent();
@@ -443,6 +446,78 @@ export function TeamDetailPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Activity Tracing */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-muted-foreground" />
+            <CardTitle>活动追踪</CardTitle>
+            <span className="text-xs text-muted-foreground ml-1">最近 100 条</span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {activitiesLoading ? (
+            <div className="space-y-2 p-4">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-3/4" />
+            </div>
+          ) : (activitiesData?.data ?? []).length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">暂无活动记录</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[90px]">时间</TableHead>
+                    <TableHead className="w-[120px]">Agent</TableHead>
+                    <TableHead className="w-[100px]">工具</TableHead>
+                    <TableHead>输入摘要</TableHead>
+                    <TableHead className="w-[80px]">耗时</TableHead>
+                    <TableHead className="w-[60px] text-center">状态</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(activitiesData?.data ?? []).map((activity) => (
+                    <TableRow key={activity.id} className="text-xs">
+                      <TableCell className="font-mono text-muted-foreground py-2">
+                        {new Date(activity.timestamp).toLocaleTimeString('zh-CN', { hour12: false })}
+                      </TableCell>
+                      <TableCell className="py-2 max-w-[120px]">
+                        <span className="truncate block" title={activity.agent_name ?? activity.agent_id}>
+                          {activity.agent_name ?? activity.agent_id}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {activity.tool_name}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-2 max-w-[300px]">
+                        <span className="truncate block text-muted-foreground" title={activity.input_summary}>
+                          {activity.input_summary || '-'}
+                        </span>
+                        {activity.error && (
+                          <span className="truncate block text-destructive text-xs mt-0.5" title={activity.error}>
+                            {activity.error}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2 font-mono text-muted-foreground">
+                        {formatDuration(activity.duration_ms)}
+                      </TableCell>
+                      <TableCell className="py-2 text-center">
+                        <StatusIcon status={activity.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

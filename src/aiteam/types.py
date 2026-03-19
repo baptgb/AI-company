@@ -326,6 +326,9 @@ class AgentActivity(BaseModel):
     input_summary: str = ""  # 输入摘要 (如命令、文件路径)
     output_summary: str = ""  # 输出摘要 (截断到500字符)
     timestamp: datetime = Field(default_factory=datetime.now)
+    duration_ms: int | None = None  # 工具调用耗时（毫秒），由Pre→Post关联填充
+    status: str = "completed"       # "running" | "completed" | "error"
+    error: str | None = None        # 错误信息
 
 
 # ============================================================

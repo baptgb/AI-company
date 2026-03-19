@@ -970,6 +970,9 @@ class StorageRepository:
         tool_name: str,
         input_summary: str = "",
         output_summary: str = "",
+        status: str = "completed",
+        duration_ms: int | None = None,
+        error: str | None = None,
     ) -> AgentActivity:
         """记录Agent的一次工具调用活动."""
         activity = AgentActivity(
@@ -978,11 +981,54 @@ class StorageRepository:
             tool_name=tool_name,
             input_summary=input_summary[:500],
             output_summary=output_summary[:500],
+            status=status,
+            duration_ms=duration_ms,
+            error=error,
         )
         orm = AgentActivityModel.from_pydantic(activity)
         async with get_session(self._db_url) as session:
             session.add(orm)
         return activity
+
+    async def find_running_activity(
+        self,
+        agent_id: str,
+        session_id: str,
+        tool_name: str,
+    ) -> AgentActivity | None:
+        """查找匹配的running状态activity（Pre→Post关联）."""
+        async with get_session(self._db_url) as session:
+            stmt = (
+                select(AgentActivityModel)
+                .where(
+                    AgentActivityModel.agent_id == agent_id,
+                    AgentActivityModel.session_id == session_id,
+                    AgentActivityModel.tool_name == tool_name,
+                    AgentActivityModel.status == "running",
+                )
+                .order_by(AgentActivityModel.timestamp.desc())
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            row = result.scalar_one_or_none()
+            return row.to_pydantic() if row else None
+
+    async def update_activity(
+        self,
+        activity_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """更新activity字段（用于PostToolUse回填duration_ms/status/output）."""
+        async with get_session(self._db_url) as session:
+            stmt = select(AgentActivityModel).where(AgentActivityModel.id == activity_id)
+            result = await session.execute(stmt)
+            row = result.scalar_one_or_none()
+            if row is None:
+                return
+            for key, value in kwargs.items():
+                if hasattr(row, key):
+                    setattr(row, key, value)
+            session.add(row)
 
     async def list_activities(
         self, agent_id: str, limit: int = 50,
@@ -1010,6 +1056,27 @@ class StorageRepository:
                 .order_by(AgentActivityModel.timestamp.desc())
                 .limit(limit)
             )
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [r.to_pydantic() for r in rows]
+
+    async def list_activities_by_team(
+        self,
+        team_id: str,
+        agent_id: str | None = None,
+        limit: int = 50,
+    ) -> list[AgentActivity]:
+        """获取团队下所有agent的活动日志，按timestamp降序."""
+        async with get_session(self._db_url) as session:
+            stmt = (
+                select(AgentActivityModel)
+                .join(AgentModel, AgentActivityModel.agent_id == AgentModel.id)
+                .where(AgentModel.team_id == team_id)
+                .order_by(AgentActivityModel.timestamp.desc())
+                .limit(limit)
+            )
+            if agent_id is not None:
+                stmt = stmt.where(AgentActivityModel.agent_id == agent_id)
             result = await session.execute(stmt)
             rows = result.scalars().all()
             return [r.to_pydantic() for r in rows]

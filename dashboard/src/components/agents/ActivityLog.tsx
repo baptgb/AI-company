@@ -1,23 +1,40 @@
-import { useAgentActivities, type AgentActivity } from '@/api/activities';
+import { useAgentActivities } from '@/api/activities';
+import type { AgentActivity } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Terminal, FileText, FileEdit, Search, Bot, Code } from 'lucide-react';
+import { Terminal, FileText, FileEdit, Search, Bot, Code, Loader2 } from 'lucide-react';
 
 const TOOL_CONFIG: Record<string, { icon: React.ElementType; color: string }> = {
-  Bash: { icon: Terminal, color: 'bg-gray-100 text-gray-800' },
-  Read: { icon: FileText, color: 'bg-blue-100 text-blue-800' },
-  Edit: { icon: FileEdit, color: 'bg-yellow-100 text-yellow-800' },
-  Write: { icon: FileEdit, color: 'bg-green-100 text-green-800' },
-  Grep: { icon: Search, color: 'bg-purple-100 text-purple-800' },
-  Glob: { icon: Search, color: 'bg-purple-100 text-purple-800' },
-  Agent: { icon: Bot, color: 'bg-orange-100 text-orange-800' },
+  Bash: { icon: Terminal, color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200' },
+  Read: { icon: FileText, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+  Edit: { icon: FileEdit, color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
+  Write: { icon: FileEdit, color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+  Grep: { icon: Search, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+  Glob: { icon: Search, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+  Agent: { icon: Bot, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
 };
 
 function getToolConfig(name: string) {
-  return TOOL_CONFIG[name] ?? { icon: Code, color: 'bg-gray-100 text-gray-700' };
+  return TOOL_CONFIG[name] ?? { icon: Code, color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' };
 }
 
 function formatTime(ts: string) {
   return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
+}
+
+export function formatDuration(ms: number | null): string {
+  if (ms === null) return '-';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function StatusIcon({ status }: { status: AgentActivity['status'] }) {
+  if (status === 'running') {
+    return <Loader2 className="h-3 w-3 animate-spin text-blue-500" aria-label="进行中" />;
+  }
+  if (status === 'error') {
+    return <span aria-label="错误" role="img">❌</span>;
+  }
+  return <span aria-label="已完成" role="img">✅</span>;
 }
 
 function ActivityItem({ activity }: { activity: AgentActivity }) {
@@ -39,6 +56,9 @@ function ActivityItem({ activity }: { activity: AgentActivity }) {
         )}
         {activity.output_summary && (
           <p className="text-muted-foreground truncate mt-0.5">&rarr; {activity.output_summary}</p>
+        )}
+        {activity.error && (
+          <p className="text-destructive truncate mt-0.5">{activity.error}</p>
         )}
       </div>
     </div>
@@ -71,3 +91,5 @@ export function ActivityLog({ agentId, limit = 50 }: { agentId: string; limit?: 
     </div>
   );
 }
+
+export { StatusIcon, ActivityItem };

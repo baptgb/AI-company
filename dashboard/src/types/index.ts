@@ -138,3 +138,17 @@ export interface Phase {
   created_at: string;
   updated_at: string;
 }
+
+export interface AgentActivity {
+  id: string;
+  agent_id: string;
+  agent_name?: string;
+  session_id: string;
+  tool_name: string;
+  input_summary: string;
+  output_summary: string;
+  status: 'running' | 'completed' | 'error';
+  duration_ms: number | null;
+  timestamp: string;
+  error?: string;
+}

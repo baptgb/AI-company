@@ -497,6 +497,9 @@ class AgentActivityModel(Base):
     input_summary: Mapped[str] = mapped_column(Text, default="")
     output_summary: Mapped[str] = mapped_column(Text, default="")
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="completed")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     def to_pydantic(self) -> AgentActivity:
         """转换为 Pydantic 模型."""
@@ -508,6 +511,9 @@ class AgentActivityModel(Base):
             input_summary=self.input_summary or "",
             output_summary=self.output_summary or "",
             timestamp=self.timestamp,
+            duration_ms=self.duration_ms,
+            status=self.status or "completed",
+            error=self.error,
         )
 
     @staticmethod
@@ -521,4 +527,7 @@ class AgentActivityModel(Base):
             input_summary=activity.input_summary,
             output_summary=activity.output_summary,
             timestamp=activity.timestamp,
+            duration_ms=activity.duration_ms,
+            status=activity.status,
+            error=activity.error,
         )
