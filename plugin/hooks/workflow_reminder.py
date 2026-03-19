@@ -7,6 +7,7 @@
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -283,6 +284,65 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                 "→ 建议 taskwall_view 查看当前任务状态"
             )
             state["last_taskwall_view"] = now
+
+    # ── 安全护栏规则 ──────────────────────────────────────────
+
+    tool_input = event_data.get("tool_input", {})
+
+    # S1: 危险命令拦截（Bash）
+    if tool_name == "Bash":
+        cmd = tool_input.get("command", "")
+        cmd_lower = cmd.lower()
+        # 递归删除根目录/主目录
+        if re.search(r"rm\s+-[^\s]*r[^\s]*\s+(/|~/|~|\*)", cmd):
+            warnings.append(
+                "[安全] 危险：检测到递归删除根目录/主目录的命令，请确认操作目标"
+            )
+        # 数据库破坏性操作
+        if re.search(r"\b(DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE)\b", cmd, re.IGNORECASE):
+            warnings.append(
+                "[安全] 危险：检测到数据库破坏性操作（DROP/TRUNCATE），请确认"
+            )
+        # force push
+        if "push" in cmd_lower and "--force" in cmd_lower:
+            warnings.append(
+                "[安全] 注意：检测到force push，可能覆盖远程历史"
+            )
+        # 过度开放权限
+        if "chmod 777" in cmd:
+            warnings.append(
+                "[安全] 安全：过度开放的文件权限（chmod 777），建议使用更严格的权限"
+            )
+        # S3: 敏感文件提交拦截（git add）
+        if "git add" in cmd_lower:
+            sensitive_patterns = [".env", "credentials", ".pem", ".key", "id_rsa"]
+            for pat in sensitive_patterns:
+                if pat in cmd_lower:
+                    warnings.append(
+                        f"[安全] 安全：检测到尝试提交敏感文件（{pat}），"
+                        "请确认该文件不包含密钥信息且已在.gitignore中"
+                    )
+                    break
+
+    # S2: 敏感信息检测（Write/Edit）
+    if tool_name in ("Write", "Edit"):
+        # 获取要写入的内容
+        content = tool_input.get("content", "") or tool_input.get("new_string", "")
+        # 硬编码密钥检测
+        if re.search(
+            r"(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]",
+            content,
+            re.IGNORECASE,
+        ):
+            warnings.append(
+                "[安全] 安全：检测到可能的硬编码密钥，建议使用环境变量"
+            )
+        # .env文件写入提醒
+        file_path = tool_input.get("file_path", "")
+        if file_path.endswith(".env") or "/.env" in file_path or "\\.env" in file_path:
+            warnings.append(
+                "[安全] 注意：.env文件不应提交到版本库，请确认.gitignore包含.env"
+            )
 
     return warnings
 
