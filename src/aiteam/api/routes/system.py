@@ -284,6 +284,13 @@ _ADVISORY_RULES: list[dict] = [
         "advice": "每次讨论后检查：有新待办？已在任务墙？口头承诺不算",
     },
     {
+        "id": "B0.15",
+        "category": "leadership",
+        "name": "项目完成经验沉淀",
+        "description": "项目或阶段完成时，组织回顾会议总结经验教训，关键发现记录到memory",
+        "advice": "使用loop_review触发回顾，或手动创建会议讨论。AWARE循环的Reflect+Enrich自动提炼经验",
+    },
+    {
         "id": "B6",
         "category": "meeting",
         "name": "会议讨论规则",

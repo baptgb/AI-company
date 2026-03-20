@@ -394,6 +394,47 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                 "→ 如是，请通知QA Agent进行验收测试"
             )
 
+    # 13. 瓶颈检测：所有任务完成或多任务blocked时提醒开会
+    # 每50次工具调用检查一次（节流）
+    bottleneck_count = state.get("bottleneck_check_count", 0) + 1
+    state["bottleneck_check_count"] = bottleneck_count
+    if bottleneck_count % 50 == 0:
+        try:
+            import urllib.request
+            api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
+            req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                teams = json.loads(resp.read().decode("utf-8")).get("data", [])
+            for t in teams:
+                if t.get("status") != "active":
+                    continue
+                tid = t["id"]
+                req2 = urllib.request.Request(f"{api_url}/api/teams/{tid}/tasks")
+                with urllib.request.urlopen(req2, timeout=2) as resp2:
+                    tasks = json.loads(resp2.read().decode("utf-8")).get("data", [])
+                pending = [tk for tk in tasks if tk.get("status") == "pending"]
+                running = [tk for tk in tasks if tk.get("status") == "running"]
+                blocked = [tk for tk in tasks if tk.get("status") == "blocked"]
+                if not pending and not running and not blocked:
+                    warnings.append("[OS提醒] 所有任务已完成，建议组织方向讨论会议确定下一步")
+                elif len(blocked) > len(running) and len(blocked) >= 2:
+                    warnings.append(f"[OS提醒] {len(blocked)}个任务阻塞中，建议组织协调会议疏通")
+        except Exception:
+            pass
+
+    # 14. 汇报格式校验
+    if tool_name == "SendMessage":
+        input_str = str(event_data.get("tool_input", {}))
+        completion_keywords = ["完成", "completed", "done", "finished", "汇报"]
+        if any(kw in input_str.lower() for kw in completion_keywords) and "shutdown" not in input_str.lower():
+            required_fields = ["完成内容", "修改文件", "测试结果"]
+            missing = [f for f in required_fields if f not in input_str]
+            if missing and len(input_str) > 100:  # 只检查较长的汇报
+                warnings.append(
+                    f"[OS提醒] 汇报可能缺少标准字段：{', '.join(missing)}。"
+                    "标准格式：完成内容/修改文件/测试结果/建议任务状态/建议memo"
+                )
+
     # ── 安全护栏规则 ──────────────────────────────────────────
 
     tool_input = event_data.get("tool_input", {})
