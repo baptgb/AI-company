@@ -336,6 +336,21 @@ class HookTranslator:
                 "trigger": "hook_auto_register",
             },
         )
+        # 决策事件：Agent创建（驾驶舱 Phase 1）
+        await self.event_bus.emit(
+            "decision.agent_created",
+            f"team:{team.id}",
+            {
+                "agent_id": new_agent.id,
+                "agent_name": agent_name,
+                "role": auto_role,
+                "team_id": team.id,
+                "team_name": team.name,
+                "rationale": "auto_registered_via_hook",
+                "alternatives": [],
+                "outcome": "pending",
+            },
+        )
         logger.info(
             "SubagentStart: 自动注册 agent '%s' → team '%s' (cc_id=%s)",
             agent_name, team.name, cc_agent_id[:8] if cc_agent_id else "?",
@@ -756,6 +771,38 @@ class HookTranslator:
                 )
             except Exception as exc:
                 logger.warning("冲突检测异常（不影响工具使用）: %s", exc)
+
+        # 决策事件：会议创建（meeting_start工具调用）
+        if tool_name == "meeting_start" and isinstance(tool_input, dict):
+            await self.event_bus.emit(
+                "decision.meeting_started",
+                f"session:{session_id}",
+                {
+                    "agent_name": payload.get("agent_type", ""),
+                    "topic": tool_input.get("topic", ""),
+                    "participants": tool_input.get("participants", []),
+                    "rationale": tool_input.get("purpose", "")[:200],
+                    "alternatives": [],
+                    "outcome": "pending",
+                    "session_id": session_id,
+                },
+            )
+
+        # 决策事件：任务分配（task_run工具调用）
+        if tool_name == "task_run" and isinstance(tool_input, dict):
+            await self.event_bus.emit(
+                "decision.task_assigned",
+                f"session:{session_id}",
+                {
+                    "agent_name": payload.get("agent_type", ""),
+                    "task_title": tool_input.get("title", tool_input.get("task", "")),
+                    "assigned_to": tool_input.get("agent_name", tool_input.get("assigned_to", "")),
+                    "rationale": tool_input.get("description", "")[:200],
+                    "alternatives": [],
+                    "outcome": "pending",
+                    "session_id": session_id,
+                },
+            )
 
         await self.event_bus.emit(
             "cc.tool_use",

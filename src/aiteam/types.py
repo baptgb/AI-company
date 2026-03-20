@@ -159,6 +159,19 @@ class EventType(str, enum.Enum):
     SYSTEM_STOPPED = "system.stopped"
     SYSTEM_ERROR = "system.error"
 
+    # Decision events (TOP2驾驶舱 — 统一决策事件流)
+    DECISION_TASK_ASSIGNED = "decision.task_assigned"
+    DECISION_APPROACH_CHOSEN = "decision.approach_chosen"
+    DECISION_AGENT_SELECTED = "decision.agent_selected"
+    DECISION_AGENT_CREATED = "decision.agent_created"
+    DECISION_MEETING_STARTED = "decision.meeting_started"
+
+    # Knowledge events
+    KNOWLEDGE_LESSON_LEARNED = "knowledge.lesson_learned"
+
+    # Intent events
+    INTENT_AGENT_WORKING = "intent.agent_working"
+
 
 # ============================================================
 # 数据模型

@@ -644,12 +644,22 @@ class StorageRepository:
         event_type: str | None = None,
         source: str | None = None,
         limit: int = 50,
+        type_prefix: str | None = None,
     ) -> list[Event]:
-        """列出事件，可按类型和来源过滤."""
+        """列出事件，可按类型和来源过滤.
+
+        Args:
+            event_type: 精确匹配事件类型（如 "agent.created"）
+            source: 精确匹配事件来源
+            limit: 返回数量上限
+            type_prefix: 前缀匹配事件类型（如 "decision." 匹配所有决策事件）
+        """
         async with get_session(self._db_url) as session:
             stmt = select(EventModel)
             if event_type is not None:
                 stmt = stmt.where(EventModel.type == event_type)
+            elif type_prefix is not None:
+                stmt = stmt.where(EventModel.type.like(f"{type_prefix}%"))
             if source is not None:
                 stmt = stmt.where(EventModel.source == source)
             stmt = stmt.order_by(EventModel.timestamp.desc()).limit(limit)

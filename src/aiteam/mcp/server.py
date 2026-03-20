@@ -1258,6 +1258,43 @@ def _ensure_api_running() -> None:
 
 
 # ============================================================
+# Tool: decision_log
+# ============================================================
+
+
+@mcp.tool()
+def decision_log(
+    team_id: str = "",
+    event_type: str = "decision",
+    limit: int = 20,
+) -> dict[str, Any]:
+    """查询团队决策日志 — 任务分配、方案选择、Agent调度等决策记录.
+
+    Args:
+        team_id: 团队ID（空字符串表示查询所有团队）
+        event_type: 事件类型或前缀，如 "decision"、"decision.task_assigned"、
+                    "knowledge"、"intent"。默认 "decision" 返回所有决策事件。
+        limit: 返回条数上限（默认20，最大200）
+
+    Returns:
+        包含决策事件列表的字典，事件按时间倒序排列。
+        每条事件的 data 字段包含：
+        - rationale: 决策理由
+        - alternatives: 备选方案列表
+        - outcome: 决策结果（pending/success/failed）
+    """
+    params: list[str] = [f"limit={limit}"]
+    if team_id:
+        params.append(f"team_id={urllib.parse.quote(team_id)}")
+    if event_type:
+        # 将纯命名空间（"decision"）转为前缀过滤（"decision."）
+        type_param = event_type if "." in event_type else f"{event_type}."
+        params.append(f"type={urllib.parse.quote(type_param)}")
+    query = "&".join(params)
+    return _api_call("GET", f"/api/decisions?{query}")
+
+
+# ============================================================
 # Tool: failure_analysis
 # ============================================================
 

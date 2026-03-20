@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from aiteam.api.routes.activities import router as activities_router
 from aiteam.api.routes.agents import router as agents_router
 from aiteam.api.routes.analytics import router as analytics_router
+from aiteam.api.routes.decisions import router as decisions_router
 from aiteam.api.routes.events import router as events_router
 from aiteam.api.routes.hooks import router as hooks_router
 from aiteam.api.routes.loop import router as loop_router
@@ -28,6 +29,7 @@ api_router.include_router(agents_router)
 api_router.include_router(tasks_router)
 api_router.include_router(task_memo_router)
 api_router.include_router(events_router)
+api_router.include_router(decisions_router)
 api_router.include_router(meetings_router)
 api_router.include_router(activities_router)
 api_router.include_router(memory_router)

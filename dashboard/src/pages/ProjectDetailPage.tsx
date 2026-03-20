@@ -30,6 +30,7 @@ import {
   Users,
   Clock,
   UserPlus,
+  GitBranch,
 } from 'lucide-react';
 import { useProject } from '@/api/projects';
 import { useTeams } from '@/api/teams';
@@ -37,10 +38,112 @@ import { useAgents, useCreateAgent, useDeleteAgent } from '@/api/agents';
 import { useRunTask } from '@/api/tasks';
 import { useCreateMeeting } from '@/api/meetings';
 import { useTeamActivities } from '@/api/activities';
+import { useDecisions } from '@/api/decisions';
+import type { DecisionEvent } from '@/api/decisions';
 import { StatusIcon, formatDuration } from '@/components/agents/ActivityLog';
 import { LiveIndicator } from '@/components/shared/LiveIndicator';
 import { RelativeTime } from '@/components/shared/RelativeTime';
 import type { Team, Agent } from '@/types';
+
+/* ── Decision Timeline ── */
+
+function decisionDotClass(type: string): string {
+  const t = type.toLowerCase();
+  if (t.includes('agent')) return 'bg-green-500';
+  if (t.includes('task')) return 'bg-blue-500';
+  if (t.includes('meeting')) return 'bg-purple-500';
+  if (t.includes('team')) return 'bg-orange-500';
+  return 'bg-gray-400';
+}
+
+function decisionLabel(event: DecisionEvent): string {
+  const t = event.type.toLowerCase();
+  const d = event.data;
+  if (t.includes('agent_created') || t.includes('agent.created')) {
+    return `Agent创建: ${d.name ?? d.agent_name ?? event.source}`;
+  }
+  if (t.includes('task_assigned') || t.includes('task.assigned')) {
+    return `任务分配: ${d.title ?? d.task_title ?? '-'}`;
+  }
+  if (t.includes('meeting')) {
+    return `会议: ${d.topic ?? d.meeting_topic ?? '-'}`;
+  }
+  if (t.includes('team_created') || t.includes('team.created')) {
+    return `团队创建: ${d.name ?? d.team_name ?? event.source}`;
+  }
+  return `${event.type}: ${event.source}`;
+}
+
+function decisionDetail(event: DecisionEvent): string | null {
+  const t = event.type.toLowerCase();
+  const d = event.data;
+  if (t.includes('agent')) return d.role ? `角色: ${d.role}` : null;
+  if (t.includes('task')) return d.assigned_to ? `分配给: ${d.assigned_to}` : null;
+  if (t.includes('meeting')) {
+    const parts = d.participants;
+    return parts && Array.isArray(parts) ? `参与者: ${parts.join(', ')}` : null;
+  }
+  return null;
+}
+
+function DecisionNode({ event, isLast }: { event: DecisionEvent; isLast: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const detail = decisionDetail(event);
+  const timeStr = new Date(event.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  return (
+    <div className="flex gap-3">
+      {/* 左侧时间线 */}
+      <div className="flex flex-col items-center flex-shrink-0">
+        <div className={`h-2.5 w-2.5 rounded-full mt-1 flex-shrink-0 ${decisionDotClass(event.type)}`} />
+        {!isLast && <div className="w-px flex-1 bg-border mt-1" />}
+      </div>
+      {/* 内容 */}
+      <div className="pb-3 min-w-0 flex-1">
+        <button
+          className="w-full text-left flex items-center gap-2 group"
+          onClick={() => detail && setExpanded(!expanded)}
+          type="button"
+        >
+          <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">{timeStr}</span>
+          <span className="text-sm font-medium truncate">{decisionLabel(event)}</span>
+          {detail && (
+            expanded
+              ? <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0 ml-auto" />
+              : <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0 ml-auto opacity-0 group-hover:opacity-100" />
+          )}
+        </button>
+        {expanded && detail && (
+          <p className="text-xs text-muted-foreground mt-1 ml-0 pl-0">{detail}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DecisionTimeline({ teamId }: { teamId: string }) {
+  const { data, isLoading } = useDecisions(teamId);
+  const events = data?.data ?? [];
+
+  return (
+    <div className="mt-4 border-t pt-4">
+      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+        <GitBranch className="h-4 w-4" /> 决策时间线
+      </h4>
+      {isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : events.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-3 text-center">暂无决策记录（团队开始工作后自动显示）</p>
+      ) : (
+        <div className="max-h-64 overflow-y-auto pr-1">
+          {events.map((event, i) => (
+            <DecisionNode key={event.id} event={event} isLast={i === events.length - 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ── Status Badges ── */
 
@@ -244,6 +347,9 @@ function ActiveTeamContent({ team }: { team: Team }) {
             </div>
           )}
         </div>
+
+        {/* 决策时间线 */}
+        <DecisionTimeline teamId={team.id} />
       </CardContent>
 
       {/* Add Agent Dialog */}
