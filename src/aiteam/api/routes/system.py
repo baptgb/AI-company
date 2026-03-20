@@ -346,6 +346,20 @@ _ADVISORY_RULES: list[dict] = [
         "description": "不做具体投资建议或交易信号（继承自研究项目约束）",
         "advice": "提供分析框架和数据，不给出具体买卖建议",
     },
+    {
+        "id": "B0.18",
+        "category": "execution",
+        "name": "2-Action持久化规则",
+        "description": "每执行2个实质性操作（编辑文件/运行命令/创建资源）后，必须用task_memo_add记录进展",
+        "advice": "上下文可能被压缩导致工作进度丢失。定期持久化是防御措施",
+    },
+    {
+        "id": "B0.19",
+        "category": "execution",
+        "name": "3次失败升级协议",
+        "description": "同一任务用同一方法连续失败3次，必须：1)改变方法 2)请求其他Agent协助 3)上报Leader",
+        "advice": "不要在同一个坑里反复跌倒。3次=必须换路",
+    },
 ]
 
 
