@@ -172,31 +172,31 @@ def test_project_detail_page(page):
         page.goto(f"{BASE_URL}/projects", wait_until="networkidle")
         page.wait_for_timeout(1500)
 
-        # 方式1: 点击"查看"/"详情"按钮
-        view_btn = page.locator("button:has-text('查看'), a:has-text('查看'), button:has-text('详情')").first
-        if view_btn.count() == 0:
-            # 方式2: 查找Eye图标按钮
-            view_btn = page.locator("button").filter(has_text="").first
-
-        if view_btn.count() > 0:
-            view_btn.click()
-            page.wait_for_timeout(2000)
-        else:
-            # 方式3: 直接通过API获取第一个项目ID
-            resp = page.request.get(f"{API_URL}/api/projects?limit=1")
-            if resp.status == 200:
-                data = resp.json()
-                projects = data.get("data", [])
-                if projects:
-                    project_id = projects[0]["id"]
-                    page.goto(f"{BASE_URL}/projects/{project_id}", wait_until="networkidle")
+        # 优先通过 API 获取第一个项目 ID，直接导航到详情页（最可靠）
+        resp = page.request.get(f"{API_URL}/api/projects?limit=1")
+        if resp.status == 200:
+            data = resp.json()
+            projects = data.get("data", [])
+            if projects:
+                project_id = projects[0]["id"]
+                page.goto(f"{BASE_URL}/projects/{project_id}", wait_until="networkidle")
+                page.wait_for_timeout(2000)
+            else:
+                # 无项目时尝试点击列表页的查看按钮
+                view_btn = page.locator(
+                    "button:has-text('查看'), a:has-text('查看'), "
+                    "button:has-text('详情'), a:has-text('详情'), "
+                    "tr td a, table a"
+                ).first
+                if view_btn.count() > 0:
+                    view_btn.click()
                     page.wait_for_timeout(2000)
                 else:
                     record(test, "无项目数据，跳过详情页测试", "WARN", "需要先创建项目")
                     return
-            else:
-                record(test, "无法获取项目列表", "WARN", f"API {resp.status}")
-                return
+        else:
+            record(test, "无法获取项目列表", "WARN", f"API {resp.status}")
+            return
 
         current_url = page.url
         if "/projects/" not in current_url:

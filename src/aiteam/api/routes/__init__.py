@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from aiteam.api.routes.health import router as health_router
 from aiteam.api.routes.activities import router as activities_router
 from aiteam.api.routes.agent_templates import router as agent_templates_router
 from aiteam.api.routes.agents import router as agents_router
@@ -25,6 +26,7 @@ from aiteam.api.routes.scheduler import router as scheduler_router
 from aiteam.api.routes.ws import router as ws_router
 
 api_router = APIRouter()
+api_router.include_router(health_router)
 api_router.include_router(projects_router)
 api_router.include_router(teams_router)
 api_router.include_router(agents_router)
