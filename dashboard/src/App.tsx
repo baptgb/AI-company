@@ -12,6 +12,7 @@ import { MeetingsPage } from '@/pages/MeetingsPage';
 import { MeetingDetailPage } from '@/pages/MeetingDetailPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { useLanguage, LanguageContext } from '@/i18n';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,11 +23,11 @@ const queryClient = new QueryClient({
   },
 });
 
-export default function App() {
+function AppWithLanguage() {
+  const language = useLanguage();
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
+    <LanguageContext.Provider value={language}>
+      <BrowserRouter>
           <Routes>
             <Route element={<AppLayout />}>
               <Route index element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
@@ -41,6 +42,15 @@ export default function App() {
             </Route>
           </Routes>
         </BrowserRouter>
+    </LanguageContext.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AppWithLanguage />
       </TooltipProvider>
     </QueryClientProvider>
   );

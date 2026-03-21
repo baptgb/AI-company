@@ -25,14 +25,21 @@ import {
   type PermanentMember,
 } from '@/api/teamConfig';
 import { useTeamTemplates, type TeamTemplate } from '@/api/teamTemplates';
+import { useContext } from 'react';
+import { LanguageContext, type Lang } from '@/i18n';
 
 export function SettingsPage() {
   // 通用设置
   const [projectName, setProjectName] = useState('AI Team OS');
   const [projectDesc, setProjectDesc] = useState('通用可复用的AI Agent团队操作系统框架');
   const [defaultModel, setDefaultModel] = useState('claude-sonnet-4-6');
-  const [defaultLang, setDefaultLang] = useState('zh');
   const [darkMode, setDarkMode] = useState(false);
+
+  const langCtx = useContext(LanguageContext);
+  const currentLang = langCtx?.lang ?? 'zh';
+  const handleLangChange = (v: string | null) => {
+    if (v && langCtx) langCtx.switchLang(v as Lang);
+  };
 
   // 基础设施设置
   const [storageBackend, setStorageBackend] = useState('sqlite');
@@ -237,8 +244,8 @@ export function SettingsPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label>默认语言</Label>
-                <Select value={defaultLang} onValueChange={(v) => v && setDefaultLang(v)}>
+                <Label>界面语言 / Interface Language</Label>
+                <Select value={currentLang} onValueChange={handleLangChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -247,6 +254,7 @@ export function SettingsPage() {
                     <SelectItem value="en">English</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">切换界面语言，立即生效</p>
               </div>
 
               <div className="flex items-center justify-between">

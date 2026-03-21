@@ -1,20 +1,23 @@
 import { useLocation } from 'react-router-dom';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
-
-const pageTitles: Record<string, string> = {
-  '/': '总览',
-  '/projects': '项目管理',
-  '/tasks': '任务看板',
-  '/events': '事件日志',
-  '/meetings': '会议室',
-  '/analytics': '活动分析',
-  '/settings': '设置',
-};
+import { useT } from '@/i18n';
 
 export function Header() {
   const location = useLocation();
-  const title = pageTitles[location.pathname] || '总览';
+  const t = useT();
+
+  const pageTitles: Record<string, string> = {
+    '/': t.nav.overview,
+    '/projects': t.nav.projects,
+    '/tasks': t.nav.tasks,
+    '/events': t.nav.events,
+    '/meetings': t.nav.meetings,
+    '/analytics': t.nav.analytics,
+    '/settings': t.nav.settings,
+  };
+
+  const title = pageTitles[location.pathname] || t.nav.overview;
 
   return (
     <header className="flex h-14 items-center gap-3 border-b px-4">

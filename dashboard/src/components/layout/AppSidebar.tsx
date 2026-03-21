@@ -23,20 +23,22 @@ import {
 } from '@/components/ui/sidebar';
 import { Badge } from '@/components/ui/badge';
 import { useWSStore } from '@/stores/websocket';
-
-const navItems = [
-  { title: '总览', path: '/', icon: LayoutDashboard },
-  { title: '项目管理', path: '/projects', icon: Users },
-  { title: '任务看板', path: '/tasks', icon: ListTodo },
-  { title: '事件日志', path: '/events', icon: Activity },
-  { title: '会议室', path: '/meetings', icon: MessageSquare },
-  { title: '活动分析', path: '/analytics', icon: BarChart3 },
-  { title: '设置', path: '/settings', icon: Settings },
-];
+import { useT } from '@/i18n';
 
 export function AppSidebar() {
   const location = useLocation();
   const connected = useWSStore((s) => s.connected);
+  const t = useT();
+
+  const navItems = [
+    { title: t.nav.overview, path: '/', icon: LayoutDashboard },
+    { title: t.nav.projects, path: '/projects', icon: Users },
+    { title: t.nav.tasks, path: '/tasks', icon: ListTodo },
+    { title: t.nav.events, path: '/events', icon: Activity },
+    { title: t.nav.meetings, path: '/meetings', icon: MessageSquare },
+    { title: t.nav.analytics, path: '/analytics', icon: BarChart3 },
+    { title: t.nav.settings, path: '/settings', icon: Settings },
+  ];
 
   return (
     <Sidebar>
@@ -49,7 +51,7 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>导航</SidebarGroupLabel>
+          <SidebarGroupLabel>{t.nav.label}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
@@ -77,7 +79,7 @@ export function AppSidebar() {
           <span
             className={`h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
           />
-          <span>{connected ? '已连接' : '未连接'}</span>
+          <span>{connected ? t.status.connected : t.status.disconnected}</span>
           <Badge variant="secondary" className="ml-auto text-[10px]">
             v0.1
           </Badge>
