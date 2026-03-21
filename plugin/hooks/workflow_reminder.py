@@ -572,6 +572,10 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
 
 
 def main() -> None:
+    # Force UTF-8 output on Windows (default is gbk, causes garbled Chinese)
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+
     try:
         raw = sys.stdin.buffer.read().decode("utf-8")
         if not raw.strip():

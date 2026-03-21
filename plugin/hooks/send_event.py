@@ -103,6 +103,10 @@ def _resolve_cc_team_name(session_id: str, agent_name: str = "") -> str | None:
 
 
 def main() -> None:
+    # Force UTF-8 output on Windows (default is gbk, causes garbled Chinese)
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+
     try:
         # On Windows stdin defaults to GBK; CC sends UTF-8, so force buffer read
         raw = sys.stdin.buffer.read().decode("utf-8")

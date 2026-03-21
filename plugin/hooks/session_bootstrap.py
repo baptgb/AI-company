@@ -207,6 +207,10 @@ def _build_briefing() -> str:
 
 
 def main() -> None:
+    # Force UTF-8 output on Windows (default is gbk, causes garbled Chinese)
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+
     # Read session info from stdin
     try:
         raw = sys.stdin.buffer.read().decode("utf-8")
