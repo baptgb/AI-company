@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { BarChart3, Activity, Users, Wrench, TrendingUp, Clock, Target, Zap } from 'lucide-react';
 import { useTeams } from '@/api/teams';
+import { useT } from '@/i18n';
 import {
   useTeamOverview,
   useToolUsage,
@@ -41,17 +42,8 @@ function getToolColor(name: string) {
   return TOOL_COLORS[name] ?? 'bg-primary';
 }
 
-function formatRelativeTime(ts: string) {
-  const diff = Date.now() - new Date(ts).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes}分钟前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}小时前`;
-  return `${Math.floor(hours / 24)}天前`;
-}
-
 export function AnalyticsPage() {
+  const t = useT();
   const { data: teamsData, isLoading: teamsLoading } = useTeams();
   const teams = teamsData?.data ?? [];
 
@@ -74,14 +66,24 @@ export function AnalyticsPage() {
   // 计算工具最大值，用于进度条
   const maxToolCount = useMemo(() => {
     if (!toolUsage || toolUsage.length === 0) return 1;
-    return Math.max(...toolUsage.map((t) => t.count), 1);
+    return Math.max(...toolUsage.map((tool) => tool.count), 1);
   }, [toolUsage]);
 
   // 计算时间线最大值
   const maxTimelineCount = useMemo(() => {
     if (!timeline || timeline.length === 0) return 1;
-    return Math.max(...timeline.map((t) => t.count), 1);
+    return Math.max(...timeline.map((item) => item.count), 1);
   }, [timeline]);
+
+  function formatRelativeTime(ts: string) {
+    const diff = Date.now() - new Date(ts).getTime();
+    const minutes = Math.floor(diff / 60_000);
+    if (minutes < 1) return t.analytics.timeJustNow;
+    if (minutes < 60) return t.analytics.timeMinutesAgo(minutes);
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t.analytics.timeHoursAgo(hours);
+    return t.analytics.timeDaysAgo(Math.floor(hours / 24));
+  }
 
   const isLoading = teamsLoading || overviewLoading;
 
@@ -91,7 +93,7 @@ export function AnalyticsPage() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">活动分析</h1>
+          <h1 className="text-lg font-semibold">{t.analytics.title}</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -103,15 +105,15 @@ export function AnalyticsPage() {
               onValueChange={(v) => setSelectedTeamId(v ?? '__all__')}
             >
               <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="选择团队">
-                  {selectedTeamId === '__all__' ? '全部团队' : (teams.find((t) => t.id === selectedTeamId)?.name ?? '选择团队')}
+                <SelectValue placeholder={t.analytics.selectTeam}>
+                  {selectedTeamId === '__all__' ? t.analytics.allTeams : (teams.find((tm) => tm.id === selectedTeamId)?.name ?? t.analytics.selectTeam)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">全部团队</SelectItem>
-                {teams.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
+                <SelectItem value="__all__">{t.analytics.allTeams}</SelectItem>
+                {teams.map((tm) => (
+                  <SelectItem key={tm.id} value={tm.id}>
+                    {tm.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -123,7 +125,7 @@ export function AnalyticsPage() {
       {/* 无团队时的提示 */}
       {!teamsLoading && teams.length === 0 && (
         <div className="rounded-lg border bg-muted/30 p-12 text-center">
-          <p className="text-sm text-muted-foreground">暂无团队数据</p>
+          <p className="text-sm text-muted-foreground">{t.analytics.noTeamData}</p>
         </div>
       )}
 
@@ -135,7 +137,7 @@ export function AnalyticsPage() {
             <Card size="sm">
               <CardHeader className="flex flex-row items-center justify-between pb-1">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  总活动数
+                  {t.analytics.totalActivities}
                 </CardTitle>
                 <Activity className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -153,7 +155,7 @@ export function AnalyticsPage() {
             <Card size="sm">
               <CardHeader className="flex flex-row items-center justify-between pb-1">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  活跃Agent
+                  {t.analytics.activeAgents}
                 </CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -174,7 +176,7 @@ export function AnalyticsPage() {
             <Card size="sm">
               <CardHeader className="flex flex-row items-center justify-between pb-1">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  最常用工具
+                  {t.analytics.topTool}
                 </CardTitle>
                 <Wrench className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -193,12 +195,12 @@ export function AnalyticsPage() {
             {/* 工具使用分布 */}
             <Card>
               <CardHeader>
-                <CardTitle>工具使用分布</CardTitle>
+                <CardTitle>{t.analytics.toolDistribution}</CardTitle>
               </CardHeader>
               <CardContent>
                 {!toolUsage || toolUsage.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    暂无工具使用数据
+                    {t.analytics.noToolData}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -224,21 +226,21 @@ export function AnalyticsPage() {
             {/* Agent活跃度排行 */}
             <Card>
               <CardHeader>
-                <CardTitle>Agent活跃度排行</CardTitle>
+                <CardTitle>{t.analytics.agentRanking}</CardTitle>
               </CardHeader>
               <CardContent>
                 {!productivity || productivity.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    暂无Agent活动数据
+                    {t.analytics.noAgentData}
                   </p>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Agent</TableHead>
-                        <TableHead className="text-right">活动数</TableHead>
-                        <TableHead className="text-right">工具种类</TableHead>
-                        <TableHead className="text-right">最后活跃</TableHead>
+                        <TableHead>{t.analytics.colAgent}</TableHead>
+                        <TableHead className="text-right">{t.analytics.colActivityCount}</TableHead>
+                        <TableHead className="text-right">{t.analytics.colToolTypes}</TableHead>
+                        <TableHead className="text-right">{t.analytics.colLastActive}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -268,12 +270,12 @@ export function AnalyticsPage() {
           {/* 活动时间线 */}
           <Card>
             <CardHeader>
-              <CardTitle>活动时间线（过去24小时）</CardTitle>
+              <CardTitle>{t.analytics.activityTimeline}</CardTitle>
             </CardHeader>
             <CardContent>
               {!timeline || timeline.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  暂无时间线数据
+                  {t.analytics.noTimelineData}
                 </p>
               ) : (
                 <div className="flex items-end gap-1 h-32">
@@ -288,7 +290,7 @@ export function AnalyticsPage() {
                       <div
                         key={i}
                         className="flex-1 flex flex-col items-center gap-1 group"
-                        title={`${hour}时: ${item.count}次活动`}
+                        title={t.analytics.timeTooltip(hour, item.count)}
                       >
                         <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                           {item.count}
@@ -311,7 +313,7 @@ export function AnalyticsPage() {
           {/* 效率指标区域 */}
           <div className="flex items-center gap-2 pt-4">
             <TrendingUp className="h-5 w-5 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">效率指标</h2>
+            <h2 className="text-lg font-semibold">{t.analytics.efficiencyMetrics}</h2>
           </div>
 
           {/* 效率统计卡片行 */}
@@ -319,7 +321,7 @@ export function AnalyticsPage() {
             <Card size="sm">
               <CardHeader className="flex flex-row items-center justify-between pb-1">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  任务完成率
+                  {t.analytics.taskCompletionRate}
                 </CardTitle>
                 <Target className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -350,7 +352,7 @@ export function AnalyticsPage() {
             <Card size="sm">
               <CardHeader className="flex flex-row items-center justify-between pb-1">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  平均完成时间
+                  {t.analytics.avgCompletionTime}
                 </CardTitle>
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -361,8 +363,8 @@ export function AnalyticsPage() {
                   <div className="text-2xl font-bold">
                     {efficiency.task_completion.avg_completion_hours != null
                       ? efficiency.task_completion.avg_completion_hours < 1
-                        ? `${Math.round(efficiency.task_completion.avg_completion_hours * 60)}分钟`
-                        : `${efficiency.task_completion.avg_completion_hours}小时`
+                        ? t.analytics.timeMinutes(Math.round(efficiency.task_completion.avg_completion_hours * 60))
+                        : t.analytics.timeHours(efficiency.task_completion.avg_completion_hours)
                       : '--'}
                   </div>
                 )}
@@ -372,7 +374,7 @@ export function AnalyticsPage() {
             <Card size="sm">
               <CardHeader className="flex flex-row items-center justify-between pb-1">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  平均工具调用/任务
+                  {t.analytics.avgToolsPerTask}
                 </CardTitle>
                 <Zap className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -391,21 +393,21 @@ export function AnalyticsPage() {
           {/* 最高效Agent排行 */}
           <Card>
             <CardHeader>
-              <CardTitle>最高效Agent排行</CardTitle>
+              <CardTitle>{t.analytics.topAgents}</CardTitle>
             </CardHeader>
             <CardContent>
               {!efficiency || efficiency.top_agents.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  暂无效率数据
+                  {t.analytics.noEfficiencyData}
                 </p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Agent</TableHead>
-                      <TableHead className="text-right">活动数</TableHead>
-                      <TableHead className="text-right">活跃时长</TableHead>
-                      <TableHead className="text-right">效率(次/时)</TableHead>
+                      <TableHead>{t.analytics.colAgent}</TableHead>
+                      <TableHead className="text-right">{t.analytics.colActivityCount}</TableHead>
+                      <TableHead className="text-right">{t.analytics.colActiveTime}</TableHead>
+                      <TableHead className="text-right">{t.analytics.colEfficiency}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { TaskCard } from './TaskCard';
+import { useT } from '@/i18n';
 import type { Task } from '@/types';
 
 interface KanbanColumnProps {
@@ -11,6 +12,7 @@ interface KanbanColumnProps {
 }
 
 export function KanbanColumn({ title, count, badgeClassName, tasks, onTaskClick }: KanbanColumnProps) {
+  const t = useT();
   return (
     <div className="flex flex-col min-w-[260px] flex-1">
       <div className="flex items-center gap-2 mb-3 px-1">
@@ -20,7 +22,7 @@ export function KanbanColumn({ title, count, badgeClassName, tasks, onTaskClick 
       <div className="flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-320px)] pr-1">
         {tasks.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-8">
-            暂无任务
+            {t.tasks.noTasks}
           </p>
         ) : (
           tasks.map((task) => (

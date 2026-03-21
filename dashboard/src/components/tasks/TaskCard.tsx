@@ -1,34 +1,34 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { RelativeTime } from '@/components/shared/RelativeTime';
+import { useT } from '@/i18n';
 import { Users, User } from 'lucide-react';
 import type { Task } from '@/types';
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pending: { label: '待处理', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  running: { label: '运行中', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  completed: { label: '已完成', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-  failed: { label: '失败', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
-};
-
-const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
-  critical: { label: '紧急', className: 'bg-red-500 text-white' },
-  high: { label: '高', className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
-  medium: { label: '中', className: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400' },
-  low: { label: '低', className: 'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400' },
-};
-
-export function statusConfig(status: string) {
-  return STATUS_CONFIG[status] ?? { label: status, className: '' };
+export function statusConfig(status: string, t: ReturnType<typeof useT>) {
+  const map: Record<string, { label: string; className: string }> = {
+    pending: { label: t.taskCard.statusPending, className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
+    running: { label: t.taskCard.statusRunning, className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+    completed: { label: t.taskCard.statusCompleted, className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
+    failed: { label: t.taskCard.statusFailed, className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+  };
+  return map[status] ?? { label: status, className: '' };
 }
 
-export function priorityConfig(priority: string) {
-  return PRIORITY_CONFIG[priority] ?? { label: priority, className: '' };
+export function priorityConfig(priority: string, t: ReturnType<typeof useT>) {
+  const map: Record<string, { label: string; className: string }> = {
+    critical: { label: t.taskCard.priorityCritical, className: 'bg-red-500 text-white' },
+    high: { label: t.taskCard.priorityHigh, className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
+    medium: { label: t.taskCard.priorityMedium, className: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400' },
+    low: { label: t.taskCard.priorityLow, className: 'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400' },
+  };
+  return map[priority] ?? { label: priority, className: '' };
 }
 
 export function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
-  const sCfg = statusConfig(task.status);
-  const pCfg = priorityConfig(task.priority);
+  const t = useT();
+  const sCfg = statusConfig(task.status, t);
+  const pCfg = priorityConfig(task.priority, t);
   const isRunning = task.status === 'running' || task.status === 'in_progress';
 
   return (
@@ -56,11 +56,10 @@ export function TaskCard({ task, onClick }: { task: Task; onClick: () => void })
           <Badge className={sCfg.className}>{sCfg.label}</Badge>
           {task.score != null && (
             <span className="text-xs font-mono text-muted-foreground">
-              {task.score.toFixed(1)}分
+              {task.score.toFixed(1)}{t.taskCard.scoreUnit}
             </span>
           )}
         </div>
-        {/* 团队名称 + 负责人 */}
         {(task.team_name || task.assigned_to) && (
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {task.team_name && (

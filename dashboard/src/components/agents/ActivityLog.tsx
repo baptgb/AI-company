@@ -1,6 +1,7 @@
 import { useAgentActivities } from '@/api/activities';
 import type { AgentActivity } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import { useT } from '@/i18n';
 import { Terminal, FileText, FileEdit, Search, Bot, Code, Loader2 } from 'lucide-react';
 
 const TOOL_CONFIG: Record<string, { icon: React.ElementType; color: string }> = {
@@ -27,14 +28,15 @@ export function formatDuration(ms: number | null): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function StatusIcon({ status }: { status: AgentActivity['status'] }) {
+export function StatusIcon({ status }: { status: AgentActivity['status'] }) {
+  const t = useT();
   if (status === 'running') {
-    return <Loader2 className="h-3 w-3 animate-spin text-blue-500" aria-label="进行中" />;
+    return <Loader2 className="h-3 w-3 animate-spin text-blue-500" aria-label={t.activityLog.ariaRunning} />;
   }
   if (status === 'error') {
-    return <span aria-label="错误" role="img">❌</span>;
+    return <span aria-label={t.activityLog.ariaError} role="img">❌</span>;
   }
-  return <span aria-label="已完成" role="img">✅</span>;
+  return <span aria-label={t.activityLog.ariaCompleted} role="img">✅</span>;
 }
 
 function ActivityItem({ activity }: { activity: AgentActivity }) {
@@ -66,17 +68,18 @@ function ActivityItem({ activity }: { activity: AgentActivity }) {
 }
 
 export function ActivityLog({ agentId, limit = 50 }: { agentId: string; limit?: number }) {
+  const t = useT();
   const { data, isLoading } = useAgentActivities(agentId, limit);
   const activities = data?.data ?? [];
 
   if (isLoading) {
-    return <div className="p-4 text-xs text-muted-foreground">加载中...</div>;
+    return <div className="p-4 text-xs text-muted-foreground">{t.activityLog.loading}</div>;
   }
 
   if (activities.length === 0) {
     return (
       <div className="p-4 text-center text-xs text-muted-foreground">
-        暂无活动记录
+        {t.activityLog.noActivities}
       </div>
     );
   }
@@ -92,4 +95,4 @@ export function ActivityLog({ agentId, limit = 50 }: { agentId: string; limit?: 
   );
 }
 
-export { StatusIcon, ActivityItem };
+export { ActivityItem };

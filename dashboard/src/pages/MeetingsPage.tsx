@@ -25,12 +25,14 @@ import { MeetingCard } from '@/components/meetings/MeetingCard';
 import { useTeams } from '@/api/teams';
 import { useCreateMeeting } from '@/api/meetings';
 import { apiFetch } from '@/api/client';
+import { useT } from '@/i18n';
 import { MessageSquare, Plus, Filter } from 'lucide-react';
 import type { Meeting, APIListResponse } from '@/types';
 
 type StatusFilter = 'all' | 'active' | 'concluded';
 
 export function MeetingsPage() {
+  const t = useT();
   const { data: teamsData, isLoading: teamsLoading } = useTeams();
   const teams = teamsData?.data ?? [];
 
@@ -111,7 +113,7 @@ export function MeetingsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">会议室</h1>
+          <h1 className="text-lg font-semibold">{t.meetings.title}</h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -127,7 +129,7 @@ export function MeetingsPage() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                全部 ({allMeetings.length})
+                {t.meetings.all(allMeetings.length)}
               </button>
               <button
                 onClick={() => setStatusFilter('active')}
@@ -137,7 +139,7 @@ export function MeetingsPage() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                进行中 ({activeCount})
+                {t.meetings.active(activeCount)}
               </button>
               <button
                 onClick={() => setStatusFilter('concluded')}
@@ -147,7 +149,7 @@ export function MeetingsPage() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                已结束 ({concludedCount})
+                {t.meetings.concluded(concludedCount)}
               </button>
             </div>
           </div>
@@ -159,55 +161,55 @@ export function MeetingsPage() {
                 render={
                   <Button size="sm">
                     <Plus className="h-4 w-4" />
-                    创建会议
+                    {t.meetings.createMeeting}
                   </Button>
                 }
               />
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                  <DialogTitle>创建新会议</DialogTitle>
+                  <DialogTitle>{t.meetings.createTitle}</DialogTitle>
                   <DialogDescription>
-                    为团队创建一个新的讨论会议
+                    {t.meetings.createDesc}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="meeting-team">选择团队</Label>
+                    <Label htmlFor="meeting-team">{t.meetings.selectTeam}</Label>
                     <Select
                       value={newTeamId}
                       onValueChange={(v) => setNewTeamId(v ?? '')}
                     >
                       <SelectTrigger className="w-full" id="meeting-team">
-                        <SelectValue placeholder="选择团队..." />
+                        <SelectValue placeholder={t.meetings.selectTeamPlaceholder} />
                       </SelectTrigger>
                       <SelectContent>
-                        {teams.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}
+                        {teams.map((tm) => (
+                          <SelectItem key={tm.id} value={tm.id}>
+                            {tm.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="meeting-topic">会议主题</Label>
+                    <Label htmlFor="meeting-topic">{t.meetings.topicLabel}</Label>
                     <Input
                       id="meeting-topic"
-                      placeholder="输入会议主题..."
+                      placeholder={t.meetings.topicPlaceholder}
                       value={newTopic}
                       onChange={(e) => setNewTopic(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="meeting-agenda">
-                      议程{' '}
+                      {t.meetings.agendaLabel}{' '}
                       <span className="text-muted-foreground font-normal">
-                        (可选)
+                        {t.meetings.agendaOptional}
                       </span>
                     </Label>
                     <Textarea
                       id="meeting-agenda"
-                      placeholder="输入会议议程..."
+                      placeholder={t.meetings.agendaPlaceholder}
                       value={newAgenda}
                       onChange={(e) => setNewAgenda(e.target.value)}
                       rows={3}
@@ -223,7 +225,7 @@ export function MeetingsPage() {
                       createMeeting.isPending
                     }
                   >
-                    {createMeeting.isPending ? '创建中...' : '创建会议'}
+                    {createMeeting.isPending ? t.common.creating : t.meetings.createMeeting}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -246,10 +248,10 @@ export function MeetingsPage() {
           <MessageSquare className="mx-auto h-10 w-10 text-muted-foreground/50" />
           <p className="mt-3 text-sm text-muted-foreground">
             {statusFilter === 'all'
-              ? '暂无会议'
+              ? t.meetings.noMeetings
               : statusFilter === 'active'
-                ? '暂无进行中的会议'
-                : '暂无已结束的会议'}
+                ? t.meetings.noActiveMeetings
+                : t.meetings.noConcludedMeetings}
           </p>
         </div>
       ) : (
@@ -258,7 +260,7 @@ export function MeetingsPage() {
           {activeMeetings.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground">
-                进行中的会议 ({activeMeetings.length})
+                {t.meetings.activeSection(activeMeetings.length)}
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {activeMeetings.map((meeting) => (
@@ -272,7 +274,7 @@ export function MeetingsPage() {
           {concludedMeetings.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground">
-                已结束的会议 ({concludedMeetings.length})
+                {t.meetings.concludedSection(concludedMeetings.length)}
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {concludedMeetings.map((meeting) => (

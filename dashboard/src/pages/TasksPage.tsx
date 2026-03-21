@@ -25,20 +25,16 @@ import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { useProjects } from '@/api/projects';
 import { useProjectTaskWall, useRunTask } from '@/api/tasks';
 import { useTeams } from '@/api/teams';
+import { useT } from '@/i18n';
 import { Plus, LayoutGrid, ChevronDown, CheckCircle2 } from 'lucide-react';
 import type { Task } from '@/types';
-
-const HORIZON_COLUMNS = [
-  { horizon: 'short' as const, title: '短期', badgeClassName: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-  { horizon: 'mid' as const, title: '中期', badgeClassName: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  { horizon: 'long' as const, title: '长期', badgeClassName: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
-];
 
 function sortByScore(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
 
 export function TasksPage() {
+  const t = useT();
   const { data: projectsData, isLoading: projectsLoading } = useProjects();
   const projects = projectsData?.data ?? [];
 
@@ -81,8 +77,14 @@ export function TasksPage() {
   // 当前项目下的团队
   const projectTeams = useMemo(() => {
     if (!activeProjectId) return [];
-    return teams.filter((t) => t.project_id === activeProjectId);
+    return teams.filter((tm) => tm.project_id === activeProjectId);
   }, [teams, activeProjectId]);
+
+  const HORIZON_COLUMNS = [
+    { horizon: 'short' as const, title: t.tasks.horizonShort, badgeClassName: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
+    { horizon: 'mid' as const, title: t.tasks.horizonMid, badgeClassName: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+    { horizon: 'long' as const, title: t.tasks.horizonLong, badgeClassName: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
+  ];
 
   function handleSubmitTask() {
     const teamId = newTaskTeamId || projectTeams[0]?.id;
@@ -106,7 +108,7 @@ export function TasksPage() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <LayoutGrid className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">项目任务墙</h1>
+          <h1 className="text-lg font-semibold">{t.tasks.title}</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -115,8 +117,8 @@ export function TasksPage() {
           ) : (
             <Select value={selectedProjectId || activeProjectId} onValueChange={(v) => setSelectedProjectId(v ?? '')}>
               <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="选择项目">
-                  {projects.find((p) => p.id === (selectedProjectId || activeProjectId))?.name ?? '选择项目'}
+                <SelectValue placeholder={t.tasks.selectProject}>
+                  {projects.find((p) => p.id === (selectedProjectId || activeProjectId))?.name ?? t.tasks.selectProject}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -131,7 +133,7 @@ export function TasksPage() {
 
           <Button onClick={() => setNewTaskOpen(true)} disabled={!activeProjectId || projectTeams.length === 0}>
             <Plus className="h-4 w-4" />
-            执行新任务
+            {t.tasks.executeTask}
           </Button>
         </div>
       </div>
@@ -139,13 +141,13 @@ export function TasksPage() {
       {/* Stats Bar */}
       {stats && (
         <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-          <span>共 {stats.total} 个任务</span>
-          <span>平均分 {stats.avg_score?.toFixed(1) ?? '-'}</span>
+          <span>{t.tasks.totalTasks(stats.total)}</span>
+          <span>{t.tasks.avgScore(stats.avg_score?.toFixed(1) ?? '-')}</span>
           {stats.by_priority && Object.entries(stats.by_priority).map(([k, v]) => (
             <span key={k}>{k}: {v as number}</span>
           ))}
           {stats.completed_count != null && (
-            <span>已完成: {stats.completed_count}</span>
+            <span>{t.tasks.completed(stats.completed_count)}</span>
           )}
         </div>
       )}
@@ -163,11 +165,11 @@ export function TasksPage() {
         </div>
       ) : wallError ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-6 text-center">
-          <p className="text-sm text-destructive">加载任务失败：{(wallError as Error).message}</p>
+          <p className="text-sm text-destructive">{t.tasks.loadFailed((wallError as Error).message)}</p>
         </div>
       ) : !activeProjectId ? (
         <div className="rounded-lg border bg-muted/30 p-12 text-center">
-          <p className="text-sm text-muted-foreground">请先选择一个项目以查看任务</p>
+          <p className="text-sm text-muted-foreground">{t.tasks.selectProjectHint}</p>
         </div>
       ) : (
         <>
@@ -194,7 +196,7 @@ export function TasksPage() {
               >
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium">已完成</span>
+                  <span className="text-sm font-medium">{t.tasks.completedSection}</span>
                   <Badge variant="secondary">{completedTasks.length}</Badge>
                 </div>
                 <ChevronDown className={`h-4 w-4 transition-transform ${completedOpen ? 'rotate-180' : ''}`} />
@@ -226,21 +228,21 @@ export function TasksPage() {
       <Dialog open={newTaskOpen} onOpenChange={setNewTaskOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>执行新任务</DialogTitle>
+            <DialogTitle>{t.tasks.executeTask}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {/* 选择目标团队 */}
             {projectTeams.length > 1 && (
               <div className="space-y-2">
-                <Label htmlFor="task-team">目标团队</Label>
+                <Label htmlFor="task-team">{t.tasks.targetTeam}</Label>
                 <Select value={newTaskTeamId || projectTeams[0]?.id || ''} onValueChange={(v) => setNewTaskTeamId(v ?? '')}>
                   <SelectTrigger>
-                    <SelectValue placeholder="选择团队" />
+                    <SelectValue placeholder={t.tasks.selectTeam} />
                   </SelectTrigger>
                   <SelectContent>
-                    {projectTeams.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
+                    {projectTeams.map((tm) => (
+                      <SelectItem key={tm.id} value={tm.id}>
+                        {tm.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -248,19 +250,19 @@ export function TasksPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="task-title">任务标题</Label>
+              <Label htmlFor="task-title">{t.tasks.taskTitle}</Label>
               <Input
                 id="task-title"
-                placeholder="输入任务标题"
+                placeholder={t.tasks.taskTitlePlaceholder}
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="task-desc">任务描述</Label>
+              <Label htmlFor="task-desc">{t.tasks.taskDesc}</Label>
               <Textarea
                 id="task-desc"
-                placeholder="输入任务描述（可选）"
+                placeholder={t.tasks.taskDescPlaceholder}
                 value={newTaskDesc}
                 onChange={(e) => setNewTaskDesc(e.target.value)}
                 rows={4}
@@ -269,13 +271,13 @@ export function TasksPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewTaskOpen(false)}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button
               onClick={handleSubmitTask}
               disabled={!newTaskTitle.trim() || runTask.isPending}
             >
-              {runTask.isPending ? '提交中...' : '提交'}
+              {runTask.isPending ? t.common.submitting : t.tasks.submit}
             </Button>
           </DialogFooter>
         </DialogContent>

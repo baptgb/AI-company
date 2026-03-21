@@ -10,20 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { statusConfig, priorityConfig } from './TaskCard';
 import { useTaskMemo } from '@/api/taskMemo';
 import type { MemoEntry } from '@/api/taskMemo';
+import { useT } from '@/i18n';
 import type { Task } from '@/types';
-
-const HORIZON_LABEL: Record<string, string> = {
-  short: '短期',
-  mid: '中期',
-  long: '长期',
-};
-
-const MEMO_TYPE_STYLE: Record<string, { label: string; className: string }> = {
-  progress: { label: '进度', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  decision: { label: '决策', className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
-  issue: { label: '问题', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
-  summary: { label: '总结', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-};
 
 function TimelineItem({ label, time }: { label: string; time: string | null }) {
   if (!time) return null;
@@ -44,12 +32,26 @@ export function TaskDetailDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
   const { data: memoData } = useTaskMemo(task?.id);
   const memos: MemoEntry[] = memoData?.data ?? [];
 
   if (!task) return null;
-  const sCfg = statusConfig(task.status);
-  const pCfg = priorityConfig(task.priority);
+  const sCfg = statusConfig(task.status, t);
+  const pCfg = priorityConfig(task.priority, t);
+
+  const HORIZON_LABEL: Record<string, string> = {
+    short: t.taskDetail.horizonShort,
+    mid: t.taskDetail.horizonMid,
+    long: t.taskDetail.horizonLong,
+  };
+
+  const MEMO_TYPE_STYLE: Record<string, { label: string; className: string }> = {
+    progress: { label: t.taskDetail.memoTypeProgress, className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+    decision: { label: t.taskDetail.memoTypeDecision, className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
+    issue: { label: t.taskDetail.memoTypeIssue, className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+    summary: { label: t.taskDetail.memoTypeSummary, className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -65,23 +67,23 @@ export function TaskDetailDialog({
 
         {/* Meta info */}
         <div className="flex items-center gap-3 text-sm flex-wrap">
-          <span className="text-muted-foreground">周期:</span>
+          <span className="text-muted-foreground">{t.taskDetail.fieldHorizon}</span>
           <span>{HORIZON_LABEL[task.horizon] ?? task.horizon}</span>
           {task.score != null && (
             <>
-              <span className="text-muted-foreground">评分:</span>
+              <span className="text-muted-foreground">{t.taskDetail.fieldScore}</span>
               <span className="font-mono">{task.score.toFixed(1)}</span>
             </>
           )}
           {task.team_name && (
             <>
-              <span className="text-muted-foreground">团队:</span>
+              <span className="text-muted-foreground">{t.taskDetail.fieldTeam}</span>
               <span>{task.team_name}</span>
             </>
           )}
           {task.assigned_to && (
             <>
-              <span className="text-muted-foreground">负责人:</span>
+              <span className="text-muted-foreground">{t.taskDetail.fieldAssignedTo}</span>
               <span>{task.assigned_to}</span>
             </>
           )}
@@ -99,7 +101,7 @@ export function TaskDetailDialog({
           <>
             <Separator />
             <div>
-              <h4 className="text-sm font-medium mb-1">描述</h4>
+              <h4 className="text-sm font-medium mb-1">{t.taskDetail.sectionDesc}</h4>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                 {task.description}
               </p>
@@ -111,7 +113,7 @@ export function TaskDetailDialog({
           <>
             <Separator />
             <div>
-              <h4 className="text-sm font-medium mb-1">结果</h4>
+              <h4 className="text-sm font-medium mb-1">{t.taskDetail.sectionResult}</h4>
               <pre className="text-xs bg-muted rounded-md p-3 overflow-auto max-h-48 whitespace-pre-wrap">
                 {task.result}
               </pre>
@@ -123,7 +125,7 @@ export function TaskDetailDialog({
           <>
             <Separator />
             <div>
-              <h4 className="text-sm font-medium mb-2">Memo ({memos.length})</h4>
+              <h4 className="text-sm font-medium mb-2">{t.taskDetail.sectionMemo} ({memos.length})</h4>
               <div className="space-y-2 max-h-48 overflow-auto">
                 {memos.map((m, i) => {
                   const style = MEMO_TYPE_STYLE[m.type] ?? MEMO_TYPE_STYLE.progress;
@@ -145,11 +147,11 @@ export function TaskDetailDialog({
 
         <Separator />
         <div>
-          <h4 className="text-sm font-medium mb-2">时间轴</h4>
+          <h4 className="text-sm font-medium mb-2">{t.taskDetail.sectionTimeline}</h4>
           <div className="space-y-1">
-            <TimelineItem label="创建" time={task.created_at} />
-            <TimelineItem label="开始" time={task.started_at} />
-            <TimelineItem label="完成" time={task.completed_at} />
+            <TimelineItem label={t.taskDetail.timelineCreated} time={task.created_at} />
+            <TimelineItem label={t.taskDetail.timelineStarted} time={task.started_at} />
+            <TimelineItem label={t.taskDetail.timelineCompleted} time={task.completed_at} />
           </div>
         </div>
       </DialogContent>

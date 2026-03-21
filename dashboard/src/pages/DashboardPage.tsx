@@ -14,6 +14,7 @@ import { useProjects } from '@/api/projects';
 import { useEvents } from '@/api/events';
 import { apiFetch } from '@/api/client';
 import { useWSStore } from '@/stores/websocket';
+import { useT } from '@/i18n';
 import type { Project, TeamStatus, APIResponse, Agent, Task, TaskWallResponse } from '@/types';
 
 function StatCard({
@@ -61,6 +62,7 @@ function ActiveProjectCard({
   project: Project;
   status: TeamStatus | undefined;
 }) {
+  const t = useT();
   const { data: taskWallData } = useQueries({
     queries: [{
       queryKey: ['projects', project.id, 'task-wall'],
@@ -90,7 +92,7 @@ function ActiveProjectCard({
         {/* 进度条 */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{completed}/{total} 任务完成</span>
+            <span>{t.dashboard.taskProgress(completed, total)}</span>
             <span>{pct}%</span>
           </div>
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -103,8 +105,8 @@ function ActiveProjectCard({
         {/* Agent状态 */}
         <p className="text-xs text-muted-foreground">
           {busyAgents > 0
-            ? `${busyAgents} 个 Agent 工作中`
-            : '暂无 Agent 活动'}
+            ? t.dashboard.agentsWorking(busyAgents)
+            : t.dashboard.noAgentActivity}
         </p>
         <Button
           variant="ghost"
@@ -112,7 +114,7 @@ function ActiveProjectCard({
           className="-ml-2"
           render={<Link to={`/projects/${project.id}`} />}
         >
-          查看详情
+          {t.dashboard.viewDetails}
           <ArrowRight className="ml-1 h-3 w-3" />
         </Button>
       </CardContent>
@@ -121,12 +123,15 @@ function ActiveProjectCard({
 }
 
 /** 解析event source为可读名称 */
-function formatEventSource(evt: { source?: string; data?: Record<string, unknown> }): string {
+function formatEventSource(
+  evt: { source?: string; data?: Record<string, unknown> },
+  t: ReturnType<typeof useT>,
+): string {
   const name = (evt.data?.name || evt.data?.team_name || evt.data?.topic) as string | undefined;
   if (name) return name;
   const source = evt.source || '';
-  if (source.startsWith('team:')) return '团队事件';
-  if (source.startsWith('meeting:')) return '会议事件';
+  if (source.startsWith('team:')) return t.dashboard.teamEvent;
+  if (source.startsWith('meeting:')) return t.dashboard.meetingEvent;
   if (source.startsWith('agent:')) return source.split(':')[1]?.substring(0, 8) || source;
   return source;
 }
@@ -138,22 +143,22 @@ function AgentDot({ status }: { status: string }) {
   return <span className="h-2 w-2 rounded-full bg-muted-foreground/40 inline-block" />;
 }
 
-function agentStatusLabel(status: string) {
-  if (status === 'busy') return '工作中';
-  if (status === 'waiting') return '等待中';
-  return '离线';
+function agentStatusLabel(status: string, t: ReturnType<typeof useT>) {
+  if (status === 'busy') return t.agentStatus.busy;
+  if (status === 'waiting') return t.agentStatus.waitingLong;
+  return t.agentStatus.offline;
 }
 
-const DEPT_LABELS: Record<string, string> = {
-  qa: 'QA',
-  frontend: '前端',
-  backend: '后端',
-  'eng-fe': '前端',
-  'eng-be': '后端',
-  eng: '工程',
-  rd: 'R&D',
-  ops: '运营',
-  other: '其他',
+const DEPT_LABELS_KEY: Record<string, keyof ReturnType<typeof useT>['projectDetail']> = {
+  qa: 'deptQA',
+  frontend: 'deptFrontend',
+  backend: 'deptBackend',
+  'eng-fe': 'deptFrontend',
+  'eng-be': 'deptBackend',
+  eng: 'deptEng',
+  rd: 'deptRD',
+  ops: 'deptOps',
+  other: 'deptOther',
 };
 
 function getDeptPrefix(name: string): string {
@@ -166,6 +171,7 @@ function getDeptPrefix(name: string): string {
 
 /** 团队Agent状态概览（按部门分组） */
 function TeamAgentOverview({ agents, teamName }: { agents: Agent[]; teamName: string }) {
+  const t = useT();
   if (agents.length === 0) return null;
 
   // 按部门前缀分组
@@ -177,6 +183,11 @@ function TeamAgentOverview({ agents, teamName }: { agents: Agent[]; teamName: st
   }
   const isGrouped = groups.size > 1;
 
+  function getDeptLabel(dept: string): string {
+    const key = DEPT_LABELS_KEY[dept];
+    return key ? (t.projectDetail[key] as string) : dept;
+  }
+
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-muted-foreground">{teamName}</p>
@@ -184,13 +195,13 @@ function TeamAgentOverview({ agents, teamName }: { agents: Agent[]; teamName: st
         <div className="space-y-2">
           {Array.from(groups.entries()).map(([dept, deptAgents]) => (
             <div key={dept} className="pl-2 border-l-2 border-muted">
-              <p className="text-xs text-muted-foreground/60 mb-1">{DEPT_LABELS[dept] ?? dept}</p>
+              <p className="text-xs text-muted-foreground/60 mb-1">{getDeptLabel(dept)}</p>
               <div className="flex flex-wrap gap-3">
                 {deptAgents.map((agent) => (
                   <div key={agent.id} className="flex items-center gap-1.5 text-sm">
                     <AgentDot status={agent.status} />
                     <span className="font-medium">{agent.name}</span>
-                    <span className="text-muted-foreground text-xs">{agentStatusLabel(agent.status)}</span>
+                    <span className="text-muted-foreground text-xs">{agentStatusLabel(agent.status, t)}</span>
                   </div>
                 ))}
               </div>
@@ -203,7 +214,7 @@ function TeamAgentOverview({ agents, teamName }: { agents: Agent[]; teamName: st
             <div key={agent.id} className="flex items-center gap-1.5 text-sm">
               <AgentDot status={agent.status} />
               <span className="font-medium">{agent.name}</span>
-              <span className="text-muted-foreground text-xs">{agentStatusLabel(agent.status)}</span>
+              <span className="text-muted-foreground text-xs">{agentStatusLabel(agent.status, t)}</span>
             </div>
           ))}
         </div>
@@ -214,12 +225,13 @@ function TeamAgentOverview({ agents, teamName }: { agents: Agent[]; teamName: st
 
 /** 待处理决策队列 */
 function BlockedTaskQueue({ blockedTasks }: { blockedTasks: Array<Task & { teamName: string }> }) {
+  const t = useT();
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <AlertTriangle className="h-4 w-4 text-yellow-500" />
-          待处理决策
+          {t.dashboard.pendingDecisions}
           {blockedTasks.length > 0 && (
             <Badge variant="outline" className="ml-1">{blockedTasks.length}</Badge>
           )}
@@ -229,7 +241,7 @@ function BlockedTaskQueue({ blockedTasks }: { blockedTasks: Array<Task & { teamN
         {blockedTasks.length === 0 ? (
           <p className="text-sm text-muted-foreground flex items-center gap-2">
             <CircleCheck className="h-4 w-4 text-green-500" />
-            无需处理的事项
+            {t.dashboard.noPendingItems}
           </p>
         ) : (
           <div className="space-y-2">
@@ -253,6 +265,7 @@ function BlockedTaskQueue({ blockedTasks }: { blockedTasks: Array<Task & { teamN
 }
 
 export function DashboardPage() {
+  const t = useT();
   const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useProjects();
   const projects = projectsData?.data ?? [];
 
@@ -309,7 +322,6 @@ export function DashboardPage() {
   const blockedTasks = allTasksWithTeam.filter((t) => t.status === 'blocked');
 
   // 有活跃任务的项目（用于指挥中心卡片）
-  // project → team 映射（通过 project_id）
   const projectTeamMap = new Map<string, TeamStatus>();
   for (const team of teams) {
     if (team.project_id) {
@@ -362,7 +374,9 @@ export function DashboardPage() {
   if (error || projectsError) {
     return (
       <div className="py-12 text-center">
-        <p className="text-sm text-destructive">加载失败: {(error ?? projectsError)?.message}</p>
+        <p className="text-sm text-destructive">
+          {t.dashboard.loadFailed((error ?? projectsError)?.message ?? '')}
+        </p>
       </div>
     );
   }
@@ -372,31 +386,31 @@ export function DashboardPage() {
       {/* Stats Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="项目数量"
+          title={t.dashboard.projectCount}
           value={projects.length}
-          description="已创建的项目总数"
+          description={t.dashboard.projectCountDesc}
           icon={Users}
         />
         <StatCard
-          title="Agent 总数"
+          title={t.dashboard.agentCount}
           value={allLoaded ? totalAgents : '--'}
           description={allLoaded && hookAgents > 0
-            ? `含 ${hookAgents} 个自动捕获的 Agent`
-            : '所有项目中的 Agent'}
+            ? t.dashboard.agentCountHookDesc(hookAgents)
+            : t.dashboard.agentCountDesc}
           icon={Bot}
           loading={statusLoading && teams.length > 0}
         />
         <StatCard
-          title="活跃任务"
+          title={t.dashboard.activeTasks}
           value={allLoaded ? activeTasks : '--'}
-          description="正在执行中的任务"
+          description={t.dashboard.activeTasksDesc}
           icon={ListTodo}
           loading={statusLoading && teams.length > 0}
         />
         <StatCard
-          title="已完成任务"
+          title={t.dashboard.completedTasks}
           value={allLoaded ? completedTasks : '--'}
-          description="累计完成的任务数"
+          description={t.dashboard.completedTasksDesc}
           icon={CheckCircle}
           loading={statusLoading && teams.length > 0}
         />
@@ -409,46 +423,46 @@ export function DashboardPage() {
         {/* System Health */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">系统健康状态</CardTitle>
+            <CardTitle className="text-base">{t.dashboard.systemHealth}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">API 状态</span>
+                <span className="text-sm text-muted-foreground">{t.dashboard.apiStatus}</span>
                 {teamsLoading ? (
                   <Skeleton className="h-5 w-14" />
                 ) : error ? (
                   <Badge variant="destructive" className="gap-1">
-                    <CircleX className="h-3 w-3" /> 离线
+                    <CircleX className="h-3 w-3" /> {t.dashboard.apiOffline}
                   </Badge>
                 ) : (
                   <Badge variant="default" className="gap-1">
-                    <CircleCheck className="h-3 w-3" /> 在线
+                    <CircleCheck className="h-3 w-3" /> {t.dashboard.apiOnline}
                   </Badge>
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">WebSocket 连接</span>
+                <span className="text-sm text-muted-foreground">{t.dashboard.wsConnection}</span>
                 {wsConnected ? (
                   <Badge variant="default" className="gap-1">
-                    <Wifi className="h-3 w-3" /> 已连接
+                    <Wifi className="h-3 w-3" /> {t.dashboard.wsConnected}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="gap-1">
-                    <WifiOff className="h-3 w-3" /> 未连接
+                    <WifiOff className="h-3 w-3" /> {t.dashboard.wsDisconnected}
                   </Badge>
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">团队数量</span>
+                <span className="text-sm text-muted-foreground">{t.dashboard.teamCount}</span>
                 <span className="text-sm font-medium">{teams.length}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">最后活动</span>
+                <span className="text-sm text-muted-foreground">{t.dashboard.lastActivity}</span>
                 <span className="text-sm font-medium">
                   {recentEvents.length > 0
                     ? new Date(recentEvents[0].timestamp).toLocaleString('zh-CN')
-                    : '暂无'}
+                    : t.dashboard.noActivity}
                 </span>
               </div>
             </div>
@@ -462,7 +476,7 @@ export function DashboardPage() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Bot className="h-4 w-4" />
-              团队状态概览
+              {t.dashboard.teamOverview}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -490,9 +504,9 @@ export function DashboardPage() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">活跃项目</CardTitle>
+            <CardTitle className="text-base">{t.dashboard.activeProjects}</CardTitle>
             <Button variant="ghost" size="sm" render={<Link to="/projects" />}>
-              全部项目
+              {t.dashboard.allProjects}
               <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
           </div>
@@ -500,7 +514,7 @@ export function DashboardPage() {
         <CardContent>
           {projects.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              暂无项目，请先创建一个项目
+              {t.dashboard.noProjects}
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -519,21 +533,21 @@ export function DashboardPage() {
       {/* 快速操作 */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">快速操作</CardTitle>
+          <CardTitle className="text-base">{t.dashboard.quickActions}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <Button variant="outline" className="justify-start gap-2" render={<Link to="/tasks" />}>
               <ListTodo className="h-4 w-4" />
-              查看任务墙
+              {t.dashboard.viewTaskWall}
             </Button>
             <Button variant="outline" className="justify-start gap-2" render={<Link to="/analytics" />}>
               <BarChart3 className="h-4 w-4" />
-              活动分析
+              {t.dashboard.viewAnalytics}
             </Button>
             <Button variant="outline" className="justify-start gap-2" render={<Link to="/settings" />}>
               <Settings className="h-4 w-4" />
-              系统设置
+              {t.dashboard.systemSettings}
             </Button>
           </div>
         </CardContent>
@@ -544,7 +558,7 @@ export function DashboardPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            近期活动
+            {t.dashboard.recentActivity}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -556,7 +570,7 @@ export function DashboardPage() {
             </div>
           ) : recentEvents.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              暂无活动记录
+              {t.dashboard.noActivityRecords}
             </p>
           ) : (
             <div className="space-y-2">
@@ -570,7 +584,7 @@ export function DashboardPage() {
                       {evt.type}
                     </Badge>
                     <span className="text-sm text-muted-foreground truncate">
-                      {formatEventSource(evt)}
+                      {formatEventSource(evt, t)}
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0 ml-2 flex items-center gap-1">
@@ -585,7 +599,7 @@ export function DashboardPage() {
                 className="w-full mt-1"
                 render={<Link to="/events" />}
               >
-                查看全部事件
+                {t.dashboard.viewAllEvents}
                 <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             </div>

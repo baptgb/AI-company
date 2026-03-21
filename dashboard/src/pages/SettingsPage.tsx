@@ -26,9 +26,11 @@ import {
 } from '@/api/teamConfig';
 import { useTeamTemplates, type TeamTemplate } from '@/api/teamTemplates';
 import { useContext } from 'react';
-import { LanguageContext, type Lang } from '@/i18n';
+import { LanguageContext, type Lang, useT } from '@/i18n';
 
 export function SettingsPage() {
+  const t = useT();
+
   // 通用设置
   const [projectName, setProjectName] = useState('AI Team OS');
   const [projectDesc, setProjectDesc] = useState('通用可复用的AI Agent团队操作系统框架');
@@ -66,14 +68,12 @@ export function SettingsPage() {
   const [editValues, setEditValues] = useState<Partial<PermanentMember>>({});
   const [newMember, setNewMember] = useState<PermanentMember | null>(null);
 
-  // 计算实际显示值（本地编辑值优先，否则用服务端数据）
   const currentAutoCreate = autoCreateTeam ?? teamDefaults?.auto_create_team ?? false;
   const currentPrefix = teamNamePrefix ?? teamDefaults?.team_name_prefix ?? '';
   const members = teamDefaults?.permanent_members ?? [];
 
-  // toast状态
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('设置已保存');
+  const [toastMessage, setToastMessage] = useState(t.settings.savedMsg);
 
   const handleStorageChange = (value: string | null) => {
     if (!value) return;
@@ -88,7 +88,7 @@ export function SettingsPage() {
   };
 
   const handleSave = () => {
-    showNotification('设置已保存');
+    showNotification(t.settings.savedMsg);
   };
 
   const handleTeamConfigSave = () => {
@@ -103,7 +103,7 @@ export function SettingsPage() {
         onSuccess: () => {
           setAutoCreateTeam(null);
           setTeamNamePrefix(null);
-          showNotification('团队配置已保存');
+          showNotification(t.settings.teamConfigSavedMsg);
         },
       },
     );
@@ -114,14 +114,14 @@ export function SettingsPage() {
     addMember.mutate(newMember, {
       onSuccess: () => {
         setNewMember(null);
-        showNotification('成员已添加');
+        showNotification(t.settings.memberAddedMsg);
       },
     });
   };
 
   const handleRemoveMember = (name: string) => {
     removeMember.mutate(name, {
-      onSuccess: () => showNotification('成员已删除'),
+      onSuccess: () => showNotification(t.settings.memberDeletedMsg),
     });
   };
 
@@ -136,7 +136,7 @@ export function SettingsPage() {
       .filter((m) => !existingNames.has(m.name))
       .map((m) => ({ name: m.name, role: m.role, model: 'claude-sonnet-4-6', enabled: true }));
     if (newMembers.length === 0) {
-      showNotification('模板中的成员已全部存在');
+      showNotification(t.settings.templateAlreadyExists);
       return;
     }
     updateDefaults.mutate(
@@ -145,7 +145,7 @@ export function SettingsPage() {
         permanent_members: [...teamDefaults.permanent_members, ...newMembers],
       },
       {
-        onSuccess: () => showNotification(`已从"${template.name}"添加 ${newMembers.length} 个成员`),
+        onSuccess: () => showNotification(t.settings.templateApplied(template.name, newMembers.length)),
       },
     );
   };
@@ -157,7 +157,6 @@ export function SettingsPage() {
 
   const saveEditing = () => {
     if (!editingMember || !teamDefaults) return;
-    // 用PUT整体更新来保存编辑
     const updatedMembers = teamDefaults.permanent_members.map((m) =>
       m.name === editingMember
         ? { ...m, name: editValues.name || m.name, role: editValues.role || m.role, model: editValues.model || m.model }
@@ -172,7 +171,7 @@ export function SettingsPage() {
         onSuccess: () => {
           setEditingMember(null);
           setEditValues({});
-          showNotification('成员信息已更新');
+          showNotification(t.settings.memberUpdatedMsg);
         },
       },
     );
@@ -194,43 +193,43 @@ export function SettingsPage() {
 
       <Tabs defaultValue={0}>
         <TabsList>
-          <TabsTrigger value={0}>通用设置</TabsTrigger>
-          <TabsTrigger value={1}>基础设施</TabsTrigger>
-          <TabsTrigger value={2}>团队配置</TabsTrigger>
-          <TabsTrigger value={3}>关于</TabsTrigger>
+          <TabsTrigger value={0}>{t.settings.tabGeneral}</TabsTrigger>
+          <TabsTrigger value={1}>{t.settings.tabInfra}</TabsTrigger>
+          <TabsTrigger value={2}>{t.settings.tabTeam}</TabsTrigger>
+          <TabsTrigger value={3}>{t.settings.tabAbout}</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: 通用设置 */}
         <TabsContent value={0}>
           <Card>
             <CardHeader>
-              <CardTitle>通用设置</CardTitle>
-              <CardDescription>配置项目基本信息和界面偏好</CardDescription>
+              <CardTitle>{t.settings.generalTitle}</CardTitle>
+              <CardDescription>{t.settings.generalDesc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-2">
-                <Label htmlFor="project-name">项目名称</Label>
+                <Label htmlFor="project-name">{t.settings.projectName}</Label>
                 <Input
                   id="project-name"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="请输入项目名称"
+                  placeholder={t.settings.projectNamePlaceholder}
                 />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="project-desc">项目描述</Label>
+                <Label htmlFor="project-desc">{t.settings.projectDesc}</Label>
                 <Textarea
                   id="project-desc"
                   value={projectDesc}
                   onChange={(e) => setProjectDesc(e.target.value)}
-                  placeholder="请输入项目描述"
+                  placeholder={t.settings.projectDescPlaceholder}
                   rows={3}
                 />
               </div>
 
               <div className="grid gap-2">
-                <Label>默认LLM模型</Label>
+                <Label>{t.settings.defaultModel}</Label>
                 <Select value={defaultModel} onValueChange={(v) => v && setDefaultModel(v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -244,7 +243,7 @@ export function SettingsPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label>界面语言 / Interface Language</Label>
+                <Label>{t.settings.interfaceLang}</Label>
                 <Select value={currentLang} onValueChange={handleLangChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -254,13 +253,13 @@ export function SettingsPage() {
                     <SelectItem value="en">English</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">切换界面语言，立即生效</p>
+                <p className="text-xs text-muted-foreground">{t.settings.langSwitchHint}</p>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>深色主题</Label>
-                  <p className="text-xs text-muted-foreground">切换深色/浅色主题模式</p>
+                  <Label>{t.settings.darkMode}</Label>
+                  <p className="text-xs text-muted-foreground">{t.settings.darkModeHint}</p>
                 </div>
                 <Switch
                   checked={darkMode}
@@ -273,7 +272,7 @@ export function SettingsPage() {
               <div className="flex justify-end">
                 <Button onClick={handleSave}>
                   <Save className="size-4" data-icon="inline-start" />
-                  保存（演示）
+                  {t.settings.saveDemo}
                 </Button>
               </div>
             </CardContent>
@@ -285,12 +284,12 @@ export function SettingsPage() {
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>存储配置</CardTitle>
-                <CardDescription>数据库和缓存后端设置</CardDescription>
+                <CardTitle>{t.settings.storageTitle}</CardTitle>
+                <CardDescription>{t.settings.storageDesc}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-2">
-                  <Label>存储后端</Label>
+                  <Label>{t.settings.storageBackend}</Label>
                   <Select value={storageBackend} onValueChange={handleStorageChange}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -303,7 +302,7 @@ export function SettingsPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="db-url">数据库URL</Label>
+                  <Label htmlFor="db-url">{t.settings.dbUrl}</Label>
                   <Input
                     id="db-url"
                     value={dbUrl}
@@ -311,28 +310,28 @@ export function SettingsPage() {
                     placeholder={storageBackend === 'sqlite' ? 'sqlite:///data/aiteam.db' : 'postgresql://localhost:5432/aiteam'}
                   />
                   <p className="text-xs text-muted-foreground">
-                    {storageBackend === 'sqlite' ? 'SQLite数据库文件路径' : 'PostgreSQL连接字符串'}
+                    {storageBackend === 'sqlite' ? t.settings.dbUrlHintSqlite : t.settings.dbUrlHintPg}
                   </p>
                 </div>
 
                 <Separator />
 
                 <div className="grid gap-2">
-                  <Label>缓存后端</Label>
+                  <Label>{t.settings.cacheBackend}</Label>
                   <Select value={cacheBackend} onValueChange={(v) => v && setCacheBackend(v)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="memory">内存缓存</SelectItem>
-                      <SelectItem value="redis">Redis</SelectItem>
+                      <SelectItem value="memory">{t.settings.cacheMemory}</SelectItem>
+                      <SelectItem value="redis">{t.settings.cacheRedis}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {cacheBackend === 'redis' && (
                   <div className="grid gap-2">
-                    <Label htmlFor="redis-url">Redis URL</Label>
+                    <Label htmlFor="redis-url">{t.settings.redisUrl}</Label>
                     <Input
                       id="redis-url"
                       value={redisUrl}
@@ -345,13 +344,13 @@ export function SettingsPage() {
                 <Separator />
 
                 <div className="grid gap-2">
-                  <Label>记忆后端</Label>
+                  <Label>{t.settings.memoryBackend}</Label>
                   <Select value={memoryBackend} onValueChange={(v) => v && setMemoryBackend(v)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="file">文件系统</SelectItem>
+                      <SelectItem value="file">{t.settings.memoryFile}</SelectItem>
                       <SelectItem value="mem0">Mem0</SelectItem>
                     </SelectContent>
                   </Select>
@@ -361,12 +360,12 @@ export function SettingsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>服务端口</CardTitle>
-                <CardDescription>API和Dashboard服务端口配置</CardDescription>
+                <CardTitle>{t.settings.portsTitle}</CardTitle>
+                <CardDescription>{t.settings.portsDesc}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-2">
-                  <Label htmlFor="api-port">API端口</Label>
+                  <Label htmlFor="api-port">{t.settings.apiPort}</Label>
                   <Input
                     id="api-port"
                     type="number"
@@ -377,7 +376,7 @@ export function SettingsPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="dashboard-port">Dashboard端口</Label>
+                  <Label htmlFor="dashboard-port">{t.settings.dashboardPort}</Label>
                   <Input
                     id="dashboard-port"
                     type="number"
@@ -392,7 +391,7 @@ export function SettingsPage() {
             <div className="flex justify-end">
               <Button onClick={handleSave}>
                 <Save className="size-4" data-icon="inline-start" />
-                保存（演示）
+                {t.settings.saveDemo}
               </Button>
             </div>
           </div>
@@ -403,14 +402,14 @@ export function SettingsPage() {
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>团队默认配置</CardTitle>
-                <CardDescription>配置自动创建团队和团队名称前缀</CardDescription>
+                <CardTitle>{t.settings.teamDefaultsTitle}</CardTitle>
+                <CardDescription>{t.settings.teamDefaultsDesc}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>自动创建团队</Label>
-                    <p className="text-xs text-muted-foreground">新项目启动时自动创建团队</p>
+                    <Label>{t.settings.autoCreateTeam}</Label>
+                    <p className="text-xs text-muted-foreground">{t.settings.autoCreateTeamHint}</p>
                   </div>
                   <Switch
                     checked={currentAutoCreate}
@@ -420,29 +419,29 @@ export function SettingsPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="team-prefix">团队名称前缀</Label>
+                  <Label htmlFor="team-prefix">{t.settings.teamNamePrefix}</Label>
                   <Input
                     id="team-prefix"
                     value={currentPrefix}
                     onChange={(e) => setTeamNamePrefix(e.target.value)}
-                    placeholder="例如: project-alpha"
+                    placeholder={t.settings.teamNamePrefixPlaceholder}
                     disabled={teamDefaultsLoading}
                   />
-                  <p className="text-xs text-muted-foreground">自动创建团队时使用的名称前缀</p>
+                  <p className="text-xs text-muted-foreground">{t.settings.teamNamePrefixHint}</p>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>团队模板</CardTitle>
-                <CardDescription>选择预设模板快速添加成员到常驻列表</CardDescription>
+                <CardTitle>{t.settings.templatesTitle}</CardTitle>
+                <CardDescription>{t.settings.templatesDesc}</CardDescription>
               </CardHeader>
               <CardContent>
                 {templatesLoading ? (
-                  <p className="text-sm text-muted-foreground">加载中...</p>
+                  <p className="text-sm text-muted-foreground">{t.common.loading}</p>
                 ) : !teamTemplates?.length ? (
-                  <p className="text-sm text-muted-foreground">暂无可用模板</p>
+                  <p className="text-sm text-muted-foreground">{t.settings.noTemplates}</p>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {teamTemplates.map((tpl) => (
@@ -454,7 +453,7 @@ export function SettingsPage() {
                           <div className="flex items-center gap-2">
                             <Users className="size-4 shrink-0 text-muted-foreground" />
                             <span className="text-sm font-medium">{tpl.name}</span>
-                            <Badge variant="secondary">{tpl.members.length} 人</Badge>
+                            <Badge variant="secondary">{t.settings.membersUnit(tpl.members.length)}</Badge>
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">{tpl.description}</p>
                         </div>
@@ -465,7 +464,7 @@ export function SettingsPage() {
                           onClick={() => handleApplyTemplate(tpl)}
                           disabled={updateDefaults.isPending || teamDefaultsLoading}
                         >
-                          使用此模板
+                          {t.settings.useTemplate}
                         </Button>
                       </div>
                     ))}
@@ -476,16 +475,16 @@ export function SettingsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>常驻团队成员</CardTitle>
+                <CardTitle>{t.settings.membersTitle}</CardTitle>
                 <CardDescription>
-                  配置每次创建团队时自动添加的常驻成员
+                  {t.settings.membersDesc}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {teamDefaultsLoading ? (
-                  <p className="text-sm text-muted-foreground">加载中...</p>
+                  <p className="text-sm text-muted-foreground">{t.common.loading}</p>
                 ) : members.length === 0 && !newMember ? (
-                  <p className="text-sm text-muted-foreground">暂无常驻成员，点击下方按钮添加</p>
+                  <p className="text-sm text-muted-foreground">{t.settings.noMembers}</p>
                 ) : (
                   <div className="space-y-3">
                     {members.map((member) => (
@@ -502,14 +501,14 @@ export function SettingsPage() {
                                   onChange={(e) =>
                                     setEditValues((v) => ({ ...v, name: e.target.value }))
                                   }
-                                  placeholder="名称"
+                                  placeholder={t.settings.memberNamePlaceholder}
                                 />
                                 <Input
                                   value={editValues.role ?? ''}
                                   onChange={(e) =>
                                     setEditValues((v) => ({ ...v, role: e.target.value }))
                                   }
-                                  placeholder="角色描述"
+                                  placeholder={t.settings.memberRolePlaceholder}
                                 />
                                 <Select
                                   value={editValues.model ?? 'claude-sonnet-4-6'}
@@ -529,10 +528,10 @@ export function SettingsPage() {
                               </div>
                             </div>
                             <Button size="sm" onClick={saveEditing} disabled={updateDefaults.isPending}>
-                              保存
+                              {t.common.save}
                             </Button>
                             <Button size="sm" variant="outline" onClick={cancelEditing}>
-                              取消
+                              {t.common.cancel}
                             </Button>
                           </>
                         ) : (
@@ -545,7 +544,7 @@ export function SettingsPage() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-medium">{member.name}</span>
                                   <Badge variant={member.enabled ? 'default' : 'secondary'}>
-                                    {member.enabled ? '启用' : '禁用'}
+                                    {member.enabled ? t.settings.memberEnabled : t.settings.memberDisabled}
                                   </Badge>
                                 </div>
                                 <p className="text-xs text-muted-foreground">{member.role}</p>
@@ -585,7 +584,7 @@ export function SettingsPage() {
                           onChange={(e) =>
                             setNewMember((m) => m && { ...m, name: e.target.value })
                           }
-                          placeholder="成员名称"
+                          placeholder={t.settings.memberNamePlaceholder}
                           autoFocus
                         />
                         <Input
@@ -593,7 +592,7 @@ export function SettingsPage() {
                           onChange={(e) =>
                             setNewMember((m) => m && { ...m, role: e.target.value })
                           }
-                          placeholder="角色描述"
+                          placeholder={t.settings.memberRolePlaceholder}
                         />
                         <Select
                           value={newMember.model}
@@ -613,10 +612,10 @@ export function SettingsPage() {
                       </div>
                     </div>
                     <Button size="sm" onClick={handleAddMember} disabled={addMember.isPending || !newMember.name}>
-                      添加
+                      {t.common.add}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setNewMember(null)}>
-                      取消
+                      {t.common.cancel}
                     </Button>
                   </div>
                 )}
@@ -630,7 +629,7 @@ export function SettingsPage() {
                     }
                   >
                     <Plus className="size-4" data-icon="inline-start" />
-                    添加常驻成员
+                    {t.settings.addMember}
                   </Button>
                 )}
               </CardContent>
@@ -639,7 +638,7 @@ export function SettingsPage() {
             <div className="flex justify-end">
               <Button onClick={handleTeamConfigSave} disabled={updateDefaults.isPending}>
                 <Save className="size-4" data-icon="inline-start" />
-                保存团队配置
+                {t.settings.saveTeamConfig}
               </Button>
             </div>
           </div>
@@ -649,33 +648,33 @@ export function SettingsPage() {
         <TabsContent value={3}>
           <Card>
             <CardHeader>
-              <CardTitle>关于 AI Team OS</CardTitle>
-              <CardDescription>版本和项目信息</CardDescription>
+              <CardTitle>{t.settings.aboutTitle}</CardTitle>
+              <CardDescription>{t.settings.aboutDesc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">版本</span>
+                  <span className="text-sm font-medium">{t.settings.version}</span>
                   <span className="text-sm text-muted-foreground">v0.2.0</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">技术栈</span>
+                  <span className="text-sm font-medium">{t.settings.techStack}</span>
                   <span className="text-sm text-muted-foreground">LangGraph + FastAPI + React</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">许可证</span>
+                  <span className="text-sm font-medium">{t.settings.license}</span>
                   <span className="text-sm text-muted-foreground">MIT License</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Python</span>
+                  <span className="text-sm font-medium">{t.settings.python}</span>
                   <span className="text-sm text-muted-foreground">3.11+</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Node.js</span>
+                  <span className="text-sm font-medium">{t.settings.nodejs}</span>
                   <span className="text-sm text-muted-foreground">18+</span>
                 </div>
               </div>
@@ -683,7 +682,7 @@ export function SettingsPage() {
               <Separator />
 
               <div className="space-y-3">
-                <h4 className="text-sm font-medium">核心依赖</h4>
+                <h4 className="text-sm font-medium">{t.settings.coreDeps}</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                   <span>LangGraph — AI编排引擎</span>
                   <span>FastAPI — REST API框架</span>

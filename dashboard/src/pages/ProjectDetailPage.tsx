@@ -43,6 +43,7 @@ import type { DecisionEvent, AgentIntent } from '@/api/decisions';
 import { StatusIcon, formatDuration } from '@/components/agents/ActivityLog';
 import { LiveIndicator } from '@/components/shared/LiveIndicator';
 import { RelativeTime } from '@/components/shared/RelativeTime';
+import { useT } from '@/i18n';
 import type { Team, Agent } from '@/types';
 
 /* ── Decision Timeline ── */
@@ -56,39 +57,40 @@ function decisionDotClass(type: string): string {
   return 'bg-gray-400';
 }
 
-function decisionLabel(event: DecisionEvent): string {
-  const t = event.type.toLowerCase();
+function decisionLabel(event: DecisionEvent, t: ReturnType<typeof useT>): string {
+  const type = event.type.toLowerCase();
   const d = event.data;
-  if (t.includes('agent_created') || t.includes('agent.created')) {
-    return `Agent创建: ${d.name ?? d.agent_name ?? event.source}`;
+  if (type.includes('agent_created') || type.includes('agent.created')) {
+    return t.projectDetail.decisionLabelAgentCreated(String(d.name ?? d.agent_name ?? event.source));
   }
-  if (t.includes('task_assigned') || t.includes('task.assigned')) {
-    return `任务分配: ${d.title ?? d.task_title ?? '-'}`;
+  if (type.includes('task_assigned') || type.includes('task.assigned')) {
+    return t.projectDetail.decisionLabelTaskAssigned(String(d.title ?? d.task_title ?? '-'));
   }
-  if (t.includes('meeting')) {
-    return `会议: ${d.topic ?? d.meeting_topic ?? '-'}`;
+  if (type.includes('meeting')) {
+    return t.projectDetail.decisionLabelMeeting(String(d.topic ?? d.meeting_topic ?? '-'));
   }
-  if (t.includes('team_created') || t.includes('team.created')) {
-    return `团队创建: ${d.name ?? d.team_name ?? event.source}`;
+  if (type.includes('team_created') || type.includes('team.created')) {
+    return t.projectDetail.decisionLabelTeamCreated(String(d.name ?? d.team_name ?? event.source));
   }
   return `${event.type}: ${event.source}`;
 }
 
-function decisionDetail(event: DecisionEvent): string | null {
-  const t = event.type.toLowerCase();
+function decisionDetail(event: DecisionEvent, t: ReturnType<typeof useT>): string | null {
+  const type = event.type.toLowerCase();
   const d = event.data;
-  if (t.includes('agent')) return d.role ? `角色: ${d.role}` : null;
-  if (t.includes('task')) return d.assigned_to ? `分配给: ${d.assigned_to}` : null;
-  if (t.includes('meeting')) {
+  if (type.includes('agent')) return d.role ? t.projectDetail.decisionDetailRole(String(d.role)) : null;
+  if (type.includes('task')) return d.assigned_to ? t.projectDetail.decisionDetailAssignedTo(String(d.assigned_to)) : null;
+  if (type.includes('meeting')) {
     const parts = d.participants;
-    return parts && Array.isArray(parts) ? `参与者: ${parts.join(', ')}` : null;
+    return parts && Array.isArray(parts) ? t.projectDetail.decisionDetailParticipants(parts.join(', ')) : null;
   }
   return null;
 }
 
 function DecisionNode({ event, isLast }: { event: DecisionEvent; isLast: boolean }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
-  const detail = decisionDetail(event);
+  const detail = decisionDetail(event, t);
   const timeStr = new Date(event.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
 
   return (
@@ -106,7 +108,7 @@ function DecisionNode({ event, isLast }: { event: DecisionEvent; isLast: boolean
           type="button"
         >
           <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">{timeStr}</span>
-          <span className="text-sm font-medium truncate">{decisionLabel(event)}</span>
+          <span className="text-sm font-medium truncate">{decisionLabel(event, t)}</span>
           {detail && (
             expanded
               ? <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0 ml-auto" />
@@ -122,18 +124,19 @@ function DecisionNode({ event, isLast }: { event: DecisionEvent; isLast: boolean
 }
 
 function DecisionTimeline({ teamId }: { teamId: string }) {
+  const t = useT();
   const { data, isLoading } = useDecisions(teamId);
   const events = data?.data ?? [];
 
   return (
     <div className="mt-4 border-t pt-4">
       <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-        <GitBranch className="h-4 w-4" /> 决策时间线
+        <GitBranch className="h-4 w-4" /> {t.projectDetail.decisionTimeline}
       </h4>
       {isLoading ? (
         <Skeleton className="h-16 w-full" />
       ) : events.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-3 text-center">暂无决策记录（团队开始工作后自动显示）</p>
+        <p className="text-xs text-muted-foreground py-3 text-center">{t.projectDetail.noDecisions}</p>
       ) : (
         <div className="max-h-64 overflow-y-auto pr-1">
           {events.map((event, i) => (
@@ -148,22 +151,25 @@ function DecisionTimeline({ teamId }: { teamId: string }) {
 /* ── Status Badges ── */
 
 function AgentStatusBadge({ status }: { status: string }) {
+  const t = useT();
   const s = status.toLowerCase();
   const variant = s === 'busy' ? 'default' : s === 'waiting' ? 'secondary' : s === 'offline' ? 'destructive' : 'outline';
-  const label = s === 'busy' ? '工作中' : s === 'waiting' ? '等待' : s === 'offline' ? '关闭' : status;
+  const label = s === 'busy' ? t.agentStatus.busy : s === 'waiting' ? t.agentStatus.waiting : s === 'offline' ? t.agentStatus.offline : status;
   return <Badge variant={variant}>{label}</Badge>;
 }
 
 function TeamStatusBadge({ status }: { status: string }) {
+  const t = useT();
   const s = status.toLowerCase();
   const variant = s === 'active' ? 'default' : s === 'completed' ? 'secondary' : 'outline';
-  const label = s === 'active' ? '进行中' : s === 'completed' ? '已完成' : s === 'archived' ? '已归档' : status;
+  const label = s === 'active' ? t.teamStatus.active : s === 'completed' ? t.teamStatus.completed : s === 'archived' ? t.teamStatus.archived : status;
   return <Badge variant={variant}>{label}</Badge>;
 }
 
 /* ── Leader Card ── */
 
 function LeaderCard({ agents }: { agents: Agent[] }) {
+  const t = useT();
   const leader = agents.find((a) => a.role === 'leader' || a.role?.includes('Leader'));
   if (!leader) return null;
 
@@ -181,20 +187,20 @@ function LeaderCard({ agents }: { agents: Agent[] }) {
       <CardContent>
         <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
           <div>
-            <p className="text-muted-foreground">名称</p>
+            <p className="text-muted-foreground">{t.projectDetail.agentName}</p>
             <p className="font-medium mt-1">{leader.name}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">模型</p>
+            <p className="text-muted-foreground">{t.projectDetail.agentModel}</p>
             <p className="mt-1">{leader.model || '--'}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">会话</p>
-            <p className="font-mono text-xs mt-1">{leader.session_id ? leader.session_id.slice(0, 8) + '...' : '无活跃会话'}</p>
+            <p className="text-muted-foreground">{t.projectDetail.agentSession}</p>
+            <p className="font-mono text-xs mt-1">{leader.session_id ? leader.session_id.slice(0, 8) + '...' : t.projectDetail.noActiveSession}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">当前任务</p>
-            <p className="mt-1">{leader.current_task || '待分配'}</p>
+            <p className="text-muted-foreground">{t.projectDetail.agentCurrentTask}</p>
+            <p className="mt-1">{leader.current_task || t.projectDetail.agentPending}</p>
           </div>
         </div>
       </CardContent>
@@ -204,7 +210,16 @@ function LeaderCard({ agents }: { agents: Agent[] }) {
 
 /* ── Active Team Section ── */
 
+function getDept(name: string): string {
+  const lower = name.toLowerCase();
+  for (const prefix of ['eng-fe', 'eng-be', 'qa', 'frontend', 'backend', 'eng', 'rd', 'ops']) {
+    if (lower.startsWith(prefix + '-') || lower === prefix) return prefix;
+  }
+  return 'other';
+}
+
 function ActiveTeamContent({ team }: { team: Team }) {
+  const t = useT();
   const { data: agentsData, isLoading } = useAgents(team.id);
   const { data: activitiesData } = useTeamActivities(team.id);
   const { data: intentsData } = useAgentIntents(team.id);
@@ -228,25 +243,18 @@ function ActiveTeamContent({ team }: { team: Team }) {
     return [...agents].sort((a, b) => (priority[a.status.toLowerCase()] ?? 99) - (priority[b.status.toLowerCase()] ?? 99));
   }, [agents]);
 
-  // 按名称前缀分组
   const DEPT_LABELS: Record<string, string> = {
-    qa: 'QA部门',
-    frontend: '前端工程',
-    backend: '后端工程',
-    'eng-fe': '前端工程',
-    'eng-be': '后端工程',
-    eng: '工程部门',
-    rd: 'R&D研发',
-    ops: '运营部门',
-    other: '其他成员',
+    qa: t.projectDetail.deptQA,
+    frontend: t.projectDetail.deptFrontend,
+    backend: t.projectDetail.deptBackend,
+    'eng-fe': t.projectDetail.deptFrontend,
+    'eng-be': t.projectDetail.deptBackend,
+    eng: t.projectDetail.deptEng,
+    rd: t.projectDetail.deptRD,
+    ops: t.projectDetail.deptOps,
+    other: t.projectDetail.deptOther,
   };
-  function getDept(name: string): string {
-    const lower = name.toLowerCase();
-    for (const prefix of ['eng-fe', 'eng-be', 'qa', 'frontend', 'backend', 'eng', 'rd', 'ops']) {
-      if (lower.startsWith(prefix + '-') || lower === prefix) return prefix;
-    }
-    return 'other';
-  }
+
   const deptGroups = useMemo(() => {
     const groups = new Map<string, Agent[]>();
     for (const agent of sortedAgents) {
@@ -275,17 +283,17 @@ function ActiveTeamContent({ team }: { team: Team }) {
             <Users className="h-5 w-5 text-blue-600" />
             <CardTitle className="text-base">{team.name}</CardTitle>
             <TeamStatusBadge status={team.status} />
-            <span className="text-sm text-muted-foreground">{agents.length} 成员</span>
+            <span className="text-sm text-muted-foreground">{t.projectDetail.memberCount(agents.length)}</span>
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
-              <Plus className="mr-1 h-3 w-3" /> Agent
+              <Plus className="mr-1 h-3 w-3" /> {t.projectDetail.addAgent}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setTaskOpen(true)}>
-              <Play className="mr-1 h-3 w-3" /> 任务
+              <Play className="mr-1 h-3 w-3" /> {t.projectDetail.runTask}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setMeetingOpen(true)}>
-              <MessageSquare className="mr-1 h-3 w-3" /> 会议
+              <MessageSquare className="mr-1 h-3 w-3" /> {t.projectDetail.startMeeting}
             </Button>
           </div>
         </div>
@@ -297,8 +305,8 @@ function ActiveTeamContent({ team }: { team: Team }) {
           <div className="flex flex-col items-center gap-3 py-8">
             <UserPlus className="h-8 w-8 text-muted-foreground/40" />
             <div className="text-center">
-              <p className="text-sm font-medium text-muted-foreground">暂无团队成员</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">点击上方 "+ Agent" 添加成员开始协作</p>
+              <p className="text-sm font-medium text-muted-foreground">{t.projectDetail.noMembers}</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">{t.projectDetail.noMembersHint}</p>
             </div>
           </div>
         ) : (
@@ -337,10 +345,10 @@ function ActiveTeamContent({ team }: { team: Team }) {
                           </div>
                         </div>
                         <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                          <p><span className="text-muted-foreground/70">角色:</span> {agent.role}</p>
+                          <p><span className="text-muted-foreground/70">{t.projectDetail.agentRole}</span> {agent.role}</p>
                           <p className="truncate">
-                            <span className="text-muted-foreground/70">任务:</span>{' '}
-                            {agent.current_task || <span className="italic">待分配</span>}
+                            <span className="text-muted-foreground/70">{t.projectDetail.agentTask}</span>{' '}
+                            {agent.current_task || <span className="italic">{t.projectDetail.agentPending}</span>}
                           </p>
                           {(() => {
                             const intent = intentMap.get(agent.id);
@@ -363,7 +371,7 @@ function ActiveTeamContent({ team }: { team: Team }) {
                             {agent.last_active_at ? (
                               <RelativeTime date={agent.last_active_at} />
                             ) : (
-                              <span className="italic">无活动记录</span>
+                              <span className="italic">{t.projectDetail.agentNoActivity}</span>
                             )}
                           </div>
                         </div>
@@ -379,21 +387,21 @@ function ActiveTeamContent({ team }: { team: Team }) {
         {/* 活动追踪 */}
         <div className="mt-4 border-t pt-4">
           <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-            <History className="h-4 w-4" /> 活动追踪
+            <History className="h-4 w-4" /> {t.projectDetail.activityTracking}
           </h4>
           {activities.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-3 text-center">暂无活动记录（Agent开始工作后自动显示）</p>
+            <p className="text-xs text-muted-foreground py-3 text-center">{t.projectDetail.noActivityHint}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-muted-foreground border-b">
-                    <th className="text-left py-1 pr-2">时间</th>
-                    <th className="text-left py-1 pr-2">Agent</th>
-                    <th className="text-left py-1 pr-2">工具</th>
-                    <th className="text-left py-1 pr-2">摘要</th>
-                    <th className="text-right py-1 pr-2">耗时</th>
-                    <th className="text-center py-1">状态</th>
+                    <th className="text-left py-1 pr-2">{t.projectDetail.colTime}</th>
+                    <th className="text-left py-1 pr-2">{t.projectDetail.colAgent}</th>
+                    <th className="text-left py-1 pr-2">{t.projectDetail.colTool}</th>
+                    <th className="text-left py-1 pr-2">{t.projectDetail.colSummary}</th>
+                    <th className="text-right py-1 pr-2">{t.projectDetail.colDuration}</th>
+                    <th className="text-center py-1">{t.projectDetail.colStatus}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -428,19 +436,21 @@ function ActiveTeamContent({ team }: { team: Team }) {
               { onSuccess: () => { setAddOpen(false); setAgentName(''); setAgentRole(''); } },
             );
           }}>
-            <DialogHeader><DialogTitle>添加 Agent</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t.projectDetail.addAgentDialog}</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>名称</Label>
+                <Label>{t.projectDetail.agentNameLabel}</Label>
                 <Input value={agentName} onChange={(e) => setAgentName(e.target.value)} required />
               </div>
               <div className="grid gap-2">
-                <Label>角色</Label>
+                <Label>{t.projectDetail.agentRoleLabel}</Label>
                 <Input value={agentRole} onChange={(e) => setAgentRole(e.target.value)} required />
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={createAgent.isPending}>{createAgent.isPending ? '添加中...' : '添加'}</Button>
+              <Button type="submit" disabled={createAgent.isPending}>
+                {createAgent.isPending ? t.common.adding : t.common.add}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -450,14 +460,14 @@ function ActiveTeamContent({ team }: { team: Team }) {
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
-            <DialogDescription>确定要删除 Agent「{deleteTarget?.name}」吗？</DialogDescription>
+            <DialogTitle>{t.projectDetail.confirmDeleteAgent}</DialogTitle>
+            <DialogDescription>{t.projectDetail.confirmDeleteAgentDesc(deleteTarget?.name ?? '')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>取消</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t.common.cancel}</Button>
             <Button variant="destructive" disabled={deleteAgent.isPending} onClick={() => {
               if (deleteTarget) deleteAgent.mutate({ id: deleteTarget.id, team_id: team.id }, { onSuccess: () => setDeleteTarget(null) });
-            }}>{deleteAgent.isPending ? '删除中...' : '确认删除'}</Button>
+            }}>{deleteAgent.isPending ? t.common.deleting : t.common.confirm_delete}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -473,19 +483,21 @@ function ActiveTeamContent({ team }: { team: Team }) {
               { onSuccess: () => { setTaskOpen(false); setTaskTitle(''); setTaskDesc(''); } },
             );
           }}>
-            <DialogHeader><DialogTitle>创建任务</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t.projectDetail.createTask}</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>标题</Label>
+                <Label>{t.projectDetail.taskTitleLabel}</Label>
                 <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} required />
               </div>
               <div className="grid gap-2">
-                <Label>描述</Label>
+                <Label>{t.projectDetail.taskDescLabel}</Label>
                 <Textarea value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} />
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={runTask.isPending}>{runTask.isPending ? '创建中...' : '创建'}</Button>
+              <Button type="submit" disabled={runTask.isPending}>
+                {runTask.isPending ? t.common.creating : t.common.create}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -502,15 +514,17 @@ function ActiveTeamContent({ team }: { team: Team }) {
               { onSuccess: (data) => { setMeetingOpen(false); setMeetingTopic(''); if (data?.data?.id) navigate(`/meetings/${data.data.id}`); } },
             );
           }}>
-            <DialogHeader><DialogTitle>发起会议</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t.projectDetail.startMeetingDialog}</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>主题</Label>
+                <Label>{t.projectDetail.meetingTopicLabel}</Label>
                 <Input value={meetingTopic} onChange={(e) => setMeetingTopic(e.target.value)} required />
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={createMeeting.isPending}>{createMeeting.isPending ? '创建中...' : '发起'}</Button>
+              <Button type="submit" disabled={createMeeting.isPending}>
+                {createMeeting.isPending ? t.common.creating : t.projectDetail.initiate}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -522,6 +536,7 @@ function ActiveTeamContent({ team }: { team: Team }) {
 /* ── Completed Team Row (collapsible) ── */
 
 function CompletedTeamRow({ team }: { team: Team }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const { data: agentsData } = useAgents(expanded ? team.id : '');
   const agents = (agentsData?.data ?? []).filter((a) => a.role !== 'leader');
@@ -558,7 +573,7 @@ function CompletedTeamRow({ team }: { team: Team }) {
             </div>
           )}
           {agents.length === 0 && !team.summary && (
-            <p className="text-xs text-muted-foreground py-2">无详细记录</p>
+            <p className="text-xs text-muted-foreground py-2">{t.projectDetail.noDetailRecord}</p>
           )}
         </div>
       )}
@@ -569,6 +584,7 @@ function CompletedTeamRow({ team }: { team: Team }) {
 /* ── Main Page ── */
 
 export function ProjectDetailPage() {
+  const t = useT();
   const { projectId } = useParams<{ projectId: string }>();
   const { data: projectData, isLoading: projectLoading, error: projectError } = useProject(projectId ?? '');
   const { data: teamsData } = useTeams();
@@ -576,21 +592,17 @@ export function ProjectDetailPage() {
   const project = projectData?.data;
   const allTeams = teamsData?.data ?? [];
 
-  // 项目关联的teams
-  const projectTeams = allTeams.filter((t) => t.project_id === projectId);
-
-  // 分类：active vs completed/archived
-  const activeTeams = projectTeams.filter((t) => t.status === 'active');
+  const projectTeams = allTeams.filter((tm) => tm.project_id === projectId);
+  const activeTeams = projectTeams.filter((tm) => tm.status === 'active');
   const completedTeams = projectTeams
-    .filter((t) => t.status === 'completed' || t.status === 'archived')
+    .filter((tm) => tm.status === 'completed' || tm.status === 'archived')
     .sort((a, b) => {
       const ta = new Date(a.created_at).getTime();
       const tb = new Date(b.created_at).getTime();
-      return tb - ta; // 最新创建的在前
+      return tb - ta;
     });
 
-  // 查找Leader：从第一个有leader_agent_id的团队中获取agents
-  const leaderTeamId = projectTeams.find((t) => t.leader_agent_id)?.id ?? projectTeams[0]?.id ?? '';
+  const leaderTeamId = projectTeams.find((tm) => tm.leader_agent_id)?.id ?? projectTeams[0]?.id ?? '';
   const { data: leaderTeamAgents } = useAgents(leaderTeamId);
   const allAgents = leaderTeamAgents?.data ?? [];
 
@@ -608,11 +620,11 @@ export function ProjectDetailPage() {
     return (
       <div className="space-y-6">
         <Button variant="ghost" render={<Link to="/projects" />}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> 返回项目列表
+          <ArrowLeft className="mr-2 h-4 w-4" /> {t.projectDetail.backToList}
         </Button>
         <div className="py-12 text-center">
           <p className="text-sm text-destructive">
-            {projectError ? `加载失败: ${projectError.message}` : '项目不存在'}
+            {projectError ? t.projectDetail.backToList + ': ' + projectError.message : t.projectDetail.projectNotFound}
           </p>
         </div>
       </div>
@@ -623,7 +635,7 @@ export function ProjectDetailPage() {
     <div className="space-y-6">
       {/* Back */}
       <Button variant="ghost" className="-ml-2" render={<Link to="/projects" />}>
-        <ArrowLeft className="mr-2 h-4 w-4" /> 返回项目列表
+        <ArrowLeft className="mr-2 h-4 w-4" /> {t.projectDetail.backToList}
       </Button>
 
       {/* Project Info */}
@@ -637,19 +649,19 @@ export function ProjectDetailPage() {
         <CardContent>
           <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
             <div>
-              <p className="text-muted-foreground">描述</p>
+              <p className="text-muted-foreground">{t.projectDetail.description}</p>
               <p className="mt-1">{project.description || '--'}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">当前团队</p>
-              <p className="mt-1">{activeTeams.length} 个</p>
+              <p className="text-muted-foreground">{t.projectDetail.activeTeams}</p>
+              <p className="mt-1">{activeTeams.length} {t.projectDetail.teamsUnit}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">历史团队</p>
-              <p className="mt-1">{completedTeams.length} 个</p>
+              <p className="text-muted-foreground">{t.projectDetail.historyTeams}</p>
+              <p className="mt-1">{completedTeams.length} {t.projectDetail.teamsUnit}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">创建时间</p>
+              <p className="text-muted-foreground">{t.projectDetail.createdAt}</p>
               <p className="mt-1">{new Date(project.created_at).toLocaleDateString('zh-CN')}</p>
             </div>
           </div>
@@ -671,7 +683,7 @@ export function ProjectDetailPage() {
           <CardContent className="py-8 text-center">
             <Users className="mx-auto h-8 w-8 text-muted-foreground/50 mb-3" />
             <p className="text-sm text-muted-foreground">
-              暂无活跃团队。通过 MCP 的 team_create 工具创建新团队开始工作。
+              {t.projectDetail.noActiveTeams}
             </p>
           </CardContent>
         </Card>
@@ -682,7 +694,7 @@ export function ProjectDetailPage() {
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-muted-foreground">
             <History className="h-4 w-4" />
-            <h3 className="text-sm font-medium">历史团队 ({completedTeams.length})</h3>
+            <h3 className="text-sm font-medium">{t.projectDetail.historyTeamsTitle(completedTeams.length)}</h3>
           </div>
           <div className="space-y-2">
             {completedTeams.map((team) => (

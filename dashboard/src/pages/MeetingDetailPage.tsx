@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { LiveIndicator } from '@/components/shared/LiveIndicator';
 import { ChatMessage } from '@/components/meetings/ChatMessage';
 import { useMeeting, useMeetingMessages } from '@/api/meetings';
+import { useT } from '@/i18n';
 import { ArrowLeft, MessageSquare, Users } from 'lucide-react';
 import type { MeetingMessage } from '@/types';
 
@@ -17,6 +18,7 @@ interface MessageGroup {
 }
 
 export function MeetingDetailPage() {
+  const t = useT();
   const { meetingId } = useParams<{ meetingId: string }>();
   const {
     data: meetingData,
@@ -79,13 +81,13 @@ export function MeetingDetailPage() {
       <div className="space-y-6">
         <Button variant="ghost" render={<Link to="/meetings" />}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          返回会议列表
+          {t.meetingDetail.backToList}
         </Button>
         <div className="py-12 text-center">
           <p className="text-sm text-destructive">
             {meetingError
-              ? `加载失败: ${meetingError.message}`
-              : '会议不存在'}
+              ? t.meetingDetail.loadFailed(meetingError.message)
+              : t.meetingDetail.notFound}
           </p>
         </div>
       </div>
@@ -103,7 +105,7 @@ export function MeetingDetailPage() {
           render={<Link to="/meetings" />}
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          返回
+          {t.meetingDetail.back}
         </Button>
         <Separator orientation="vertical" className="h-5" />
         <div className="flex items-center gap-2">
@@ -115,23 +117,23 @@ export function MeetingDetailPage() {
             <div className="flex items-center gap-1.5">
               <LiveIndicator />
               <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                进行中
+                {t.meetingDetail.statusActive}
               </Badge>
             </div>
           ) : (
-            <Badge variant="secondary">会议已结束</Badge>
+            <Badge variant="secondary">{t.meetingDetail.statusEnded}</Badge>
           )}
         </div>
         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
           <Users className="h-3 w-3" />
-          <span>{meeting.participants.length} 人参与</span>
+          <span>{t.meetingDetail.participants(meeting.participants.length)}</span>
         </div>
       </div>
 
       {/* Message stream */}
       <Card className="flex-1 overflow-hidden">
         <CardHeader className="py-3">
-          <CardTitle className="text-sm">会议讨论</CardTitle>
+          <CardTitle className="text-sm">{t.meetingDetail.discussion}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div ref={scrollRef} className="max-h-[calc(100vh-260px)] overflow-y-auto px-4 pb-4">
@@ -149,7 +151,7 @@ export function MeetingDetailPage() {
               </div>
             ) : messages.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-sm text-muted-foreground">暂无讨论消息</p>
+                <p className="text-sm text-muted-foreground">{t.meetingDetail.noMessages}</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -159,7 +161,7 @@ export function MeetingDetailPage() {
                     <div className="flex items-center gap-3 py-3">
                       <Separator className="flex-1" />
                       <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                        第 {group.round} 轮
+                        {t.meetingDetail.round(group.round)}
                       </span>
                       <Separator className="flex-1" />
                     </div>

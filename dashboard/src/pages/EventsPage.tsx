@@ -19,11 +19,12 @@ import {
 import { EventRow } from '@/components/events/EventRow';
 import { useEvents } from '@/api/events';
 import { useWSStore } from '@/stores/websocket';
+import { useT } from '@/i18n';
 import { Radio, Wifi, WifiOff } from 'lucide-react';
 import type { Event } from '@/types';
 
 const EVENT_TYPE_OPTIONS = [
-  { value: '__all__', label: '全部类型' },
+  { value: '__all__', labelKey: 'allTypes' as const },
   { value: 'team', label: 'team.*' },
   { value: 'agent', label: 'agent.*' },
   { value: 'task', label: 'task.*' },
@@ -31,13 +32,8 @@ const EVENT_TYPE_OPTIONS = [
   { value: 'system', label: 'system.*' },
 ];
 
-const LIMIT_OPTIONS = [
-  { value: '50', label: '50条' },
-  { value: '100', label: '100条' },
-  { value: '200', label: '200条' },
-];
-
 export function EventsPage() {
+  const t = useT();
   const [typeFilter, setTypeFilter] = useState('__all__');
   const [sourceFilter, setSourceFilter] = useState('');
   const [limit, setLimit] = useState('50');
@@ -51,6 +47,12 @@ export function EventsPage() {
   });
 
   const apiEvents = useMemo(() => data?.data ?? [], [data?.data]);
+
+  const LIMIT_OPTIONS = [
+    { value: '50', label: t.events.limit50 },
+    { value: '100', label: t.events.limit100 },
+    { value: '200', label: t.events.limit200 },
+  ];
 
   // Merge WS events on top of API events, deduplicated by id
   const mergedEvents = useMemo(() => {
@@ -93,19 +95,19 @@ export function EventsPage() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Radio className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">事件日志</h1>
+          <h1 className="text-lg font-semibold">{t.events.title}</h1>
         </div>
 
         <div className="flex items-center gap-2">
           {connected ? (
             <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
               <Wifi className="h-3 w-3 mr-1" />
-              已连接
+              {t.status.connected}
             </Badge>
           ) : (
             <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
               <WifiOff className="h-3 w-3 mr-1" />
-              未连接
+              {t.status.disconnected}
             </Badge>
           )}
         </div>
@@ -115,19 +117,19 @@ export function EventsPage() {
       <div className="flex flex-wrap items-center gap-2">
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? '__all__')}>
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="全部类型" />
+            <SelectValue placeholder={t.events.allTypes} />
           </SelectTrigger>
           <SelectContent>
             {EVENT_TYPE_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+                {'labelKey' in opt ? t.events[opt.labelKey] : opt.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         <Input
-          placeholder="按来源过滤..."
+          placeholder={t.events.filterBySource}
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
           className="w-[180px]"
@@ -157,11 +159,11 @@ export function EventsPage() {
         </div>
       ) : error ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-6 text-center">
-          <p className="text-sm text-destructive">加载事件失败：{(error as Error).message}</p>
+          <p className="text-sm text-destructive">{t.events.loadFailed((error as Error).message)}</p>
         </div>
       ) : mergedEvents.length === 0 ? (
         <div className="rounded-lg border bg-muted/30 p-12 text-center">
-          <p className="text-sm text-muted-foreground">暂无事件记录</p>
+          <p className="text-sm text-muted-foreground">{t.events.noEvents}</p>
         </div>
       ) : (
         <div className="rounded-lg border">
@@ -169,10 +171,10 @@ export function EventsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8" />
-                <TableHead className="w-[120px]">时间</TableHead>
-                <TableHead className="w-[140px]">类型</TableHead>
-                <TableHead className="w-[120px]">来源</TableHead>
-                <TableHead>摘要</TableHead>
+                <TableHead className="w-[120px]">{t.events.colTime}</TableHead>
+                <TableHead className="w-[140px]">{t.events.colType}</TableHead>
+                <TableHead className="w-[120px]">{t.events.colSource}</TableHead>
+                <TableHead>{t.events.colSummary}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

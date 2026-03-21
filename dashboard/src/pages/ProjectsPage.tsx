@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, Eye, Trash2 } from 'lucide-react';
 import { useProjects, useCreateProject, useDeleteProject, useProjectPhases } from '@/api/projects';
+import { useT } from '@/i18n';
 import type { Project } from '@/types';
 
 function PhaseCount({ projectId }: { projectId: string }) {
@@ -33,6 +34,7 @@ function PhaseCount({ projectId }: { projectId: string }) {
 }
 
 export function ProjectsPage() {
+  const t = useT();
   const { data, isLoading, error } = useProjects();
   const projects = data?.data ?? [];
   const createProject = useCreateProject();
@@ -68,16 +70,16 @@ export function ProjectsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">项目管理</h1>
+        <h1 className="text-2xl font-bold">{t.projects.title}</h1>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          创建项目
+          {t.projects.createProject}
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>项目列表</CardTitle>
+          <CardTitle>{t.projects.projectList}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -88,21 +90,21 @@ export function ProjectsPage() {
             </div>
           ) : error ? (
             <p className="text-sm text-destructive">
-              加载失败: {error.message}
+              {t.projects.loadFailed(error.message)}
             </p>
           ) : projects.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              暂无项目，点击上方按钮创建第一个项目
+              {t.projects.noProjects}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>名称</TableHead>
-                  <TableHead>描述</TableHead>
-                  <TableHead>任务数</TableHead>
-                  <TableHead>创建时间</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableHead>{t.projects.colName}</TableHead>
+                  <TableHead>{t.projects.colDesc}</TableHead>
+                  <TableHead>{t.projects.colTaskCount}</TableHead>
+                  <TableHead>{t.projects.colCreatedAt}</TableHead>
+                  <TableHead className="text-right">{t.projects.colActions}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -126,7 +128,7 @@ export function ProjectsPage() {
                           render={<Link to={`/projects/${project.id}`} />}
                         >
                           <Eye className="mr-1 h-3 w-3" />
-                          详情
+                          {t.projects.viewDetail}
                         </Button>
                         <Button
                           variant="ghost"
@@ -137,7 +139,7 @@ export function ProjectsPage() {
                           }}
                         >
                           <Trash2 className="mr-1 h-3 w-3 text-destructive" />
-                          删除
+                          {t.projects.deleteProject}
                         </Button>
                       </div>
                     </TableCell>
@@ -153,14 +155,14 @@ export function ProjectsPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
+            <DialogTitle>{t.projects.confirmDelete}</DialogTitle>
             <DialogDescription>
-              确定要删除项目「{deleteTarget?.name}」吗？此操作不可撤销。
+              {t.projects.confirmDeleteDesc(deleteTarget?.name ?? '')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button
               variant="destructive"
@@ -172,7 +174,7 @@ export function ProjectsPage() {
               }}
               disabled={deleteProject.isPending}
             >
-              {deleteProject.isPending ? '删除中...' : '确认删除'}
+              {deleteProject.isPending ? t.common.deleting : t.projects.confirmDelete}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -183,36 +185,36 @@ export function ProjectsPage() {
         <DialogContent className="sm:max-w-md">
           <form onSubmit={handleCreate}>
             <DialogHeader>
-              <DialogTitle>创建项目</DialogTitle>
+              <DialogTitle>{t.projects.createTitle}</DialogTitle>
               <DialogDescription>
-                创建一个新的 AI Agent 项目
+                {t.projects.createDesc}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="project-name">项目名称</Label>
+                <Label htmlFor="project-name">{t.projects.projectName}</Label>
                 <Input
                   id="project-name"
-                  placeholder="输入项目名称"
+                  placeholder={t.projects.projectNamePlaceholder}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   required
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="project-desc">项目描述</Label>
+                <Label htmlFor="project-desc">{t.projects.projectDesc}</Label>
                 <Textarea
                   id="project-desc"
-                  placeholder="输入项目描述（可选）"
+                  placeholder={t.projects.projectDescPlaceholder}
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="project-root">根路径</Label>
+                <Label htmlFor="project-root">{t.projects.rootPath}</Label>
                 <Input
                   id="project-root"
-                  placeholder="项目根目录路径（可选）"
+                  placeholder={t.projects.rootPathPlaceholder}
                   value={newRootPath}
                   onChange={(e) => setNewRootPath(e.target.value)}
                 />
@@ -220,7 +222,7 @@ export function ProjectsPage() {
             </div>
             <DialogFooter>
               <Button type="submit" disabled={createProject.isPending || !newName.trim()}>
-                {createProject.isPending ? '创建中...' : '创建'}
+                {createProject.isPending ? t.common.creating : t.common.create}
               </Button>
             </DialogFooter>
           </form>
