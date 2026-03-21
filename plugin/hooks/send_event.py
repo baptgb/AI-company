@@ -148,10 +148,7 @@ def main() -> None:
         )
 
         with urllib.request.urlopen(req, timeout=1.5) as resp:
-            result = json.loads(resp.read().decode())
-            # 返回决策给CC（对于PreToolUse等需要决策的hook）
-            if "decision" in result:
-                print(json.dumps(result))
+            resp.read()  # 消费响应但不输出——决策由workflow_reminder.py负责
 
     except urllib.error.URLError as e:
         # OS服务未启动，输出到stderr方便调试（不阻塞CC）
