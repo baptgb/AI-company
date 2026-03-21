@@ -645,6 +645,7 @@ def task_create(
     priority: str = "medium",
     horizon: str = "mid",
     tags: list[str] | None = None,
+    auto_start: bool = False,
 ) -> dict[str, Any]:
     """Create a new task in a project (not bound to a team).
 
@@ -658,6 +659,7 @@ def task_create(
         priority: Priority, one of "critical" / "high" / "medium" / "low"
         horizon: Time horizon, one of "short" / "mid" / "long"
         tags: Tag list
+        auto_start: If True, immediately set status to 'running' after creation
 
     Returns:
         Created task info
@@ -673,7 +675,14 @@ def task_create(
     }
     if tags:
         payload["tags"] = tags
-    return _api_call("POST", f"/api/projects/{resolved}/tasks", payload)
+    result = _api_call("POST", f"/api/projects/{resolved}/tasks", payload)
+    # Auto-start: set task to running immediately after creation
+    if auto_start and result.get("success") and result.get("data", {}).get("id"):
+        task_id = result["data"]["id"]
+        _api_call("PUT", f"/api/tasks/{task_id}", {"status": "running"})
+        result["data"]["status"] = "running"
+        result["message"] = "任务已创建并开始执行"
+    return result
 
 
 # ============================================================
