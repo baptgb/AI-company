@@ -144,21 +144,70 @@ function agentStatusLabel(status: string) {
   return '离线';
 }
 
-/** 团队Agent状态概览 */
+const DEPT_LABELS: Record<string, string> = {
+  qa: 'QA',
+  frontend: '前端',
+  backend: '后端',
+  'eng-fe': '前端',
+  'eng-be': '后端',
+  eng: '工程',
+  rd: 'R&D',
+  ops: '运营',
+  other: '其他',
+};
+
+function getDeptPrefix(name: string): string {
+  const lower = name.toLowerCase();
+  for (const prefix of ['eng-fe', 'eng-be', 'qa', 'frontend', 'backend', 'eng', 'rd', 'ops']) {
+    if (lower.startsWith(prefix + '-') || lower === prefix) return prefix;
+  }
+  return 'other';
+}
+
+/** 团队Agent状态概览（按部门分组） */
 function TeamAgentOverview({ agents, teamName }: { agents: Agent[]; teamName: string }) {
   if (agents.length === 0) return null;
+
+  // 按部门前缀分组
+  const groups = new Map<string, Agent[]>();
+  for (const agent of agents) {
+    const dept = getDeptPrefix(agent.name);
+    if (!groups.has(dept)) groups.set(dept, []);
+    groups.get(dept)!.push(agent);
+  }
+  const isGrouped = groups.size > 1;
+
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <p className="text-xs font-medium text-muted-foreground">{teamName}</p>
-      <div className="flex flex-wrap gap-3">
-        {agents.map((agent) => (
-          <div key={agent.id} className="flex items-center gap-1.5 text-sm">
-            <AgentDot status={agent.status} />
-            <span className="font-medium">{agent.name}</span>
-            <span className="text-muted-foreground text-xs">{agentStatusLabel(agent.status)}</span>
-          </div>
-        ))}
-      </div>
+      {isGrouped ? (
+        <div className="space-y-2">
+          {Array.from(groups.entries()).map(([dept, deptAgents]) => (
+            <div key={dept} className="pl-2 border-l-2 border-muted">
+              <p className="text-xs text-muted-foreground/60 mb-1">{DEPT_LABELS[dept] ?? dept}</p>
+              <div className="flex flex-wrap gap-3">
+                {deptAgents.map((agent) => (
+                  <div key={agent.id} className="flex items-center gap-1.5 text-sm">
+                    <AgentDot status={agent.status} />
+                    <span className="font-medium">{agent.name}</span>
+                    <span className="text-muted-foreground text-xs">{agentStatusLabel(agent.status)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-3">
+          {agents.map((agent) => (
+            <div key={agent.id} className="flex items-center gap-1.5 text-sm">
+              <AgentDot status={agent.status} />
+              <span className="font-medium">{agent.name}</span>
+              <span className="text-muted-foreground text-xs">{agentStatusLabel(agent.status)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

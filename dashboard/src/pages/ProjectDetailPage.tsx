@@ -228,6 +228,35 @@ function ActiveTeamContent({ team }: { team: Team }) {
     return [...agents].sort((a, b) => (priority[a.status.toLowerCase()] ?? 99) - (priority[b.status.toLowerCase()] ?? 99));
   }, [agents]);
 
+  // 按名称前缀分组
+  const DEPT_LABELS: Record<string, string> = {
+    qa: 'QA部门',
+    frontend: '前端工程',
+    backend: '后端工程',
+    'eng-fe': '前端工程',
+    'eng-be': '后端工程',
+    eng: '工程部门',
+    rd: 'R&D研发',
+    ops: '运营部门',
+    other: '其他成员',
+  };
+  function getDept(name: string): string {
+    const lower = name.toLowerCase();
+    for (const prefix of ['eng-fe', 'eng-be', 'qa', 'frontend', 'backend', 'eng', 'rd', 'ops']) {
+      if (lower.startsWith(prefix + '-') || lower === prefix) return prefix;
+    }
+    return 'other';
+  }
+  const deptGroups = useMemo(() => {
+    const groups = new Map<string, Agent[]>();
+    for (const agent of sortedAgents) {
+      const dept = getDept(agent.name);
+      if (!groups.has(dept)) groups.set(dept, []);
+      groups.get(dept)!.push(agent);
+    }
+    return groups;
+  }, [sortedAgents]);
+
   const [addOpen, setAddOpen] = useState(false);
   const [agentName, setAgentName] = useState('');
   const [agentRole, setAgentRole] = useState('');
@@ -273,65 +302,77 @@ function ActiveTeamContent({ team }: { team: Team }) {
             </div>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {sortedAgents.map((agent) => {
-              const isBusy = agent.status.toLowerCase() === 'busy';
-              return (
-                <div
-                  key={agent.id}
-                  className={`relative rounded-lg border p-3 transition-colors ${
-                    isBusy
-                      ? 'border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/10'
-                      : 'border-l-4 border-l-gray-300 dark:border-l-gray-600'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Bot className={`h-4 w-4 flex-shrink-0 ${isBusy ? 'text-green-600' : 'text-muted-foreground'}`} />
-                      <span className="font-medium text-sm truncate">{agent.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <AgentStatusBadge status={agent.status} />
-                      {isBusy && <LiveIndicator />}
-                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setDeleteTarget({ id: agent.id, name: agent.name })}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                    <p><span className="text-muted-foreground/70">角色:</span> {agent.role}</p>
-                    <p className="truncate">
-                      <span className="text-muted-foreground/70">任务:</span>{' '}
-                      {agent.current_task || <span className="italic">待分配</span>}
-                    </p>
-                    {(() => {
-                      const intent = intentMap.get(agent.id);
-                      if (!isBusy || !intent?.tool_name) return null;
-                      return (
-                        <div className="mt-1 rounded bg-green-50/50 dark:bg-green-950/20 px-1.5 py-1 space-y-0.5">
-                          <p className="font-medium text-green-700 dark:text-green-400 truncate">
-                            {intent.intent_summary}
-                          </p>
-                          {intent.input_preview && (
-                            <p className="truncate text-muted-foreground/80" title={intent.input_preview}>
-                              {intent.input_preview}
-                            </p>
-                          )}
+          <div className="space-y-5">
+            {Array.from(deptGroups.entries()).map(([dept, deptAgents]) => (
+              <div key={dept}>
+                {deptGroups.size > 1 && (
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    {DEPT_LABELS[dept] ?? dept}
+                    <span className="ml-1 font-normal normal-case">({deptAgents.length})</span>
+                  </p>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {deptAgents.map((agent) => {
+                    const isBusy = agent.status.toLowerCase() === 'busy';
+                    return (
+                      <div
+                        key={agent.id}
+                        className={`relative rounded-lg border p-3 transition-colors ${
+                          isBusy
+                            ? 'border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/10'
+                            : 'border-l-4 border-l-gray-300 dark:border-l-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Bot className={`h-4 w-4 flex-shrink-0 ${isBusy ? 'text-green-600' : 'text-muted-foreground'}`} />
+                            <span className="font-medium text-sm truncate">{agent.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <AgentStatusBadge status={agent.status} />
+                            {isBusy && <LiveIndicator />}
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setDeleteTarget({ id: agent.id, name: agent.name })}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                      );
-                    })()}
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-muted-foreground/50" />
-                      {agent.last_active_at ? (
-                        <RelativeTime date={agent.last_active_at} />
-                      ) : (
-                        <span className="italic">无活动记录</span>
-                      )}
-                    </div>
-                  </div>
+                        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                          <p><span className="text-muted-foreground/70">角色:</span> {agent.role}</p>
+                          <p className="truncate">
+                            <span className="text-muted-foreground/70">任务:</span>{' '}
+                            {agent.current_task || <span className="italic">待分配</span>}
+                          </p>
+                          {(() => {
+                            const intent = intentMap.get(agent.id);
+                            if (!isBusy || !intent?.tool_name) return null;
+                            return (
+                              <div className="mt-1 rounded bg-green-50/50 dark:bg-green-950/20 px-1.5 py-1 space-y-0.5">
+                                <p className="font-medium text-green-700 dark:text-green-400 truncate">
+                                  {intent.intent_summary}
+                                </p>
+                                {intent.input_preview && (
+                                  <p className="truncate text-muted-foreground/80" title={intent.input_preview}>
+                                    {intent.input_preview}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-muted-foreground/50" />
+                            {agent.last_active_at ? (
+                              <RelativeTime date={agent.last_active_at} />
+                            ) : (
+                              <span className="italic">无活动记录</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
 

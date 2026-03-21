@@ -18,7 +18,7 @@ curl -s --max-time 2 http://localhost:8000/api/teams
 
 ### 2. 启动API服务（后台）
 ```bash
-cd C:/Users/TUF/Desktop/AI团队框架/ai-team-os
+# 在项目根目录执行（即包含 pyproject.toml 的目录）
 python -m uvicorn aiteam.api.app:create_app --host 0.0.0.0 --port 8000 --factory &
 ```
 等待3秒后验证：
@@ -35,7 +35,8 @@ curl -s --max-time 2 http://localhost:5173
 
 ### 4. 启动Dashboard（后台）
 ```bash
-cd C:/Users/TUF/Desktop/AI团队框架/ai-team-os/dashboard
+# 在项目的 dashboard 子目录执行
+cd dashboard
 npm run dev &
 ```
 等待5秒后验证：

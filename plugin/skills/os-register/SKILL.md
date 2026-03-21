@@ -35,7 +35,7 @@ autoTrigger: true
 如果返回 `unhealthy`，尝试自动启动服务：
 
 ```bash
-cd C:/Users/TUF/Desktop/AI团队框架/ai-team-os
+# 在项目根目录执行（即包含 pyproject.toml 的目录）
 python -m uvicorn aiteam.api.app:create_app --host 0.0.0.0 --port 8000 --factory &
 ```
 

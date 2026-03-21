@@ -2,7 +2,8 @@
 # stdout内容会作为additionalContext注入子agent上下文
 param()
 
-$projectRoot = "C:\Users\TUF\Desktop\AI团队框架\ai-team-os"
+# Derive project root from script location: .claude/hooks/ → project root
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $claudeMd = Join-Path $projectRoot "CLAUDE.md"
 
 $output = ""

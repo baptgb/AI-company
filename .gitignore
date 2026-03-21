@@ -41,10 +41,21 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 
+# Linter cache
+.ruff_cache/
+
 # Temp
 *.tmp
 *.log
+tmp_*
 tempnpm-cache/
 dashboard/tempnpm-cache/
 test-screenshots/
 aiteam.db.migrated
+
+# MCP config (generated per-user, see .mcp.json.example)
+.mcp.json
+
+# Claude settings (generated per-user, see .claude/settings.json.example)
+.claude/settings.json
+.claude/settings.local.json
