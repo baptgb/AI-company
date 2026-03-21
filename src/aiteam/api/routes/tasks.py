@@ -12,6 +12,7 @@ from aiteam.api.deps import get_event_bus, get_manager, get_repository
 from aiteam.api.event_bus import EventBus
 from aiteam.api.exceptions import NotFoundError
 from aiteam.api.schemas import APIListResponse, APIResponse, IssueReport, TaskCreateBody, TaskDecompose, TaskRun
+from aiteam.loop.what_if import WhatIfAnalyzer
 from aiteam.orchestrator.team_manager import TeamManager
 from aiteam.storage.repository import StorageRepository
 from aiteam.types import Task, TaskStatus
@@ -571,3 +572,29 @@ async def update_issue_status(
         "data": task.model_dump(mode="json"),
         "message": f"Issue 状态已更新: {current_status} → {new_status}",
     }
+
+
+@router.get("/api/tasks/{task_id}/what-if")
+async def what_if_analysis(
+    task_id: str,
+    team_id: str = "",
+    repo: StorageRepository = Depends(get_repository),
+    manager: TeamManager = Depends(get_manager),
+) -> dict[str, Any]:
+    """对任务进行What-If分析 — 生成多方案对比和推荐."""
+    task = await repo.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"任务 {task_id} 不存在")
+
+    # 解析team_id：优先用参数，其次用任务自带的team_id
+    resolved_team_id = team_id or (task.team_id or "")
+    if not resolved_team_id:
+        raise HTTPException(status_code=400, detail="缺少 team_id，请通过查询参数传入")
+
+    analyzer = WhatIfAnalyzer(repo)
+    result = await analyzer.analyze_task(task_id, resolved_team_id)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return {"success": True, "data": result}

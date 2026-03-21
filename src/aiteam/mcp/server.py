@@ -1417,6 +1417,31 @@ def failure_analysis(task_id: str, team_id: str) -> dict[str, Any]:
 
 
 # ============================================================
+# Tool: what_if_analysis
+# ============================================================
+
+
+@mcp.tool()
+def what_if_analysis(task_id: str, team_id: str = "") -> dict[str, Any]:
+    """对任务进行What-If分析 — 生成多方案对比和推荐.
+
+    在任务规划阶段生成2-3个替代方案，通过评分模型快速对比：
+    - 方案A：最佳角色匹配分配（风险最低）
+    - 方案B：并行拆分执行（速度更快，idle agents >= 2时出现）
+    - 方案C：基于历史经验驱动（团队有记忆时出现）
+
+    Args:
+        task_id: 要分析的任务 ID
+        team_id: 所属团队 ID（可选，任务已绑定团队时可留空）
+
+    Returns:
+        包含 approaches 列表、recommendation 推荐方案和分析时间的字典
+    """
+    params = f"?team_id={urllib.parse.quote(team_id)}" if team_id else ""
+    return _api_call("GET", f"/api/tasks/{task_id}/what-if{params}")
+
+
+# ============================================================
 # Entry point
 # ============================================================
 
