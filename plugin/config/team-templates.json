@@ -2,44 +2,53 @@
   "templates": [
     {
       "id": "fullstack",
-      "name": "全栈开发团队",
-      "description": "前后端+测试的标准开发团队",
+      "name": "Full-Stack Dev Team",
+      "description": "Frontend + backend + QA for standard development work",
       "members": [
-        {"name": "frontend-engineer", "role": "前端工程师"},
-        {"name": "backend-engineer", "role": "后端工程师"},
-        {"name": "qa-observer", "role": "QA观察员"},
-        {"name": "bug-fixer", "role": "Bug修复工程师"}
+        {"name": "frontend-dev", "role": "frontend-developer"},
+        {"name": "backend-dev", "role": "backend-architect"},
+        {"name": "qa-engineer", "role": "testing-qa-engineer"},
+        {"name": "bug-fixer", "role": "testing-bug-fixer"}
       ]
     },
     {
       "id": "research",
-      "name": "研究团队",
-      "description": "多角度技术研究和方案设计",
+      "name": "Research Team",
+      "description": "Multi-angle technical research and architecture design",
       "members": [
-        {"name": "researcher-1", "role": "研究员A"},
-        {"name": "researcher-2", "role": "研究员B"},
-        {"name": "arch-designer", "role": "架构设计师"},
-        {"name": "qa-observer", "role": "QA观察员"},
-        {"name": "bug-fixer", "role": "Bug修复工程师"}
+        {"name": "architect", "role": "software-architect"},
+        {"name": "ai-engineer", "role": "ai-engineer"},
+        {"name": "tech-writer", "role": "technical-writer"},
+        {"name": "qa-engineer", "role": "testing-qa-engineer"}
       ]
     },
     {
       "id": "bugfix",
-      "name": "Bug修复团队",
-      "description": "专注问题排查和修复",
+      "name": "Bug Fix Team",
+      "description": "Focused problem diagnosis and resolution",
       "members": [
-        {"name": "bug-fixer", "role": "Bug修复工程师"},
-        {"name": "qa-observer", "role": "QA观察员"},
-        {"name": "debugger", "role": "调试专家"}
+        {"name": "bug-fixer", "role": "testing-bug-fixer"},
+        {"name": "qa-engineer", "role": "testing-qa-engineer"},
+        {"name": "code-reviewer", "role": "code-reviewer"}
+      ]
+    },
+    {
+      "id": "devops",
+      "name": "DevOps Team",
+      "description": "CI/CD, deployment, infrastructure, and reliability",
+      "members": [
+        {"name": "devops", "role": "engineering-devops-automator"},
+        {"name": "sre", "role": "sre"},
+        {"name": "security", "role": "security-engineer"}
       ]
     },
     {
       "id": "minimal",
-      "name": "最小团队",
-      "description": "只有常驻成员的最小配置",
+      "name": "Minimal Team",
+      "description": "QA + Bug-fixer only, the permanent core",
       "members": [
-        {"name": "qa-observer", "role": "QA观察员"},
-        {"name": "bug-fixer", "role": "Bug修复工程师"}
+        {"name": "qa-engineer", "role": "testing-qa-engineer"},
+        {"name": "bug-fixer", "role": "testing-bug-fixer"}
       ]
     }
   ]
