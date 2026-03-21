@@ -193,3 +193,41 @@ async def conclude_meeting(
         )
 
     return APIResponse(data=updated, message="会议已结束，结论已保存到团队记忆")
+
+
+@router.put(
+    "/api/meetings/{meeting_id}",
+    response_model=APIResponse[Meeting],
+)
+async def update_meeting(
+    meeting_id: str,
+    body: dict,
+    repo: StorageRepository = Depends(get_repository),
+) -> APIResponse[Meeting]:
+    """Update meeting fields (partial update — topic, participants, notes, etc.).
+
+    Allows updating arbitrary meeting fields such as topic, participants, or notes.
+    To conclude a meeting use the dedicated /conclude endpoint instead.
+
+    Args:
+        meeting_id: Meeting ID
+        body: Fields to update (partial update)
+
+    Returns:
+        Updated meeting info
+    """
+    meeting = await repo.get_meeting(meeting_id)
+    if meeting is None:
+        from aiteam.api.exceptions import NotFoundError
+        msg = f"会议 '{meeting_id}' 不存在"
+        raise NotFoundError(msg)
+    # Remove protected fields that should not be updated via this generic endpoint
+    body.pop("id", None)
+    body.pop("team_id", None)
+    body.pop("status", None)
+    body.pop("concluded_at", None)
+    if not body:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="无更新字段")
+    updated = await repo.update_meeting(meeting_id, **body)
+    return APIResponse(data=updated, message="会议更新成功")

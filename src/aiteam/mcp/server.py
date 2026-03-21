@@ -1859,6 +1859,181 @@ def find_skill(
 
 
 # ============================================================
+# Tool: project_list
+# ============================================================
+
+
+@mcp.tool()
+def project_list() -> dict[str, Any]:
+    """List all projects in the system.
+
+    Returns:
+        projects: List of all projects with id, name, description, root_path, etc.
+    """
+    return _api_call("GET", "/api/projects")
+
+
+# ============================================================
+# Tool: meeting_list
+# ============================================================
+
+
+@mcp.tool()
+def meeting_list(
+    team_id: str = "",
+    status: str = "",
+) -> dict[str, Any]:
+    """List meetings for a team, optionally filtered by status.
+
+    Args:
+        team_id: Team ID or name (optional, auto-uses active team if empty)
+        status: Filter by meeting status: "active" or "concluded" (optional, returns all if empty)
+
+    Returns:
+        Meeting list with topic, status, participant count, etc.
+    """
+    resolved = _resolve_team_id(team_id)
+    if not resolved:
+        return {"success": False, "error": "未找到活跃团队，请提供 team_id 或先创建团队"}
+    path = f"/api/teams/{resolved}/meetings"
+    if status:
+        path += f"?status={urllib.parse.quote(status)}"
+    return _api_call("GET", path)
+
+
+# ============================================================
+# Tool: team_close
+# ============================================================
+
+
+@mcp.tool()
+def team_close(team_id: str = "") -> dict[str, Any]:
+    """Close (complete) a team — sets team status to completed and marks all busy agents as offline.
+
+    Use this when the team's mission is fully done. Members are not deleted,
+    but their status is set to offline automatically.
+
+    Args:
+        team_id: Team ID or name (optional, auto-uses active team if empty)
+
+    Returns:
+        Updated team info with status=completed
+    """
+    resolved = _resolve_team_id(team_id)
+    if not resolved:
+        return {"success": False, "error": "未找到活跃团队，请提供 team_id 或先创建团队"}
+    return _api_call("PUT", f"/api/teams/{resolved}", {"status": "completed"})
+
+
+# ============================================================
+# Tool: task_list_project
+# ============================================================
+
+
+@mcp.tool()
+def task_list_project(
+    project_id: str = "",
+    horizon: str = "",
+    priority: str = "",
+) -> dict[str, Any]:
+    """Get project-level task wall — all tasks belonging to a project (across all teams).
+
+    Unlike taskwall_view (which is team-scoped), this returns tasks from all teams
+    under a project plus standalone project-level tasks.
+
+    Args:
+        project_id: Project ID (optional, auto-uses active project if empty)
+        horizon: Filter by time horizon: "short" / "mid" / "long" (optional)
+        priority: Filter by priority: "critical" / "high" / "medium" / "low" (optional)
+
+    Returns:
+        Project task wall with wall (grouped by horizon), completed tasks, and stats
+    """
+    resolved = _resolve_project_id(project_id)
+    if not resolved:
+        return {"success": False, "error": "未找到活跃项目，请提供 project_id 或先创建项目"}
+    params: list[str] = []
+    if horizon:
+        params.append(f"horizon={urllib.parse.quote(horizon)}")
+    if priority:
+        params.append(f"priority={urllib.parse.quote(priority)}")
+    qs = f"?{'&'.join(params)}" if params else ""
+    return _api_call("GET", f"/api/projects/{resolved}/task-wall{qs}")
+
+
+# ============================================================
+# Tool: agent_activity_query
+# ============================================================
+
+
+@mcp.tool()
+def agent_activity_query(
+    team_id: str = "",
+    agent_id: str = "",
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Query Agent activity records for a team.
+
+    Returns recent activity log entries sorted by timestamp descending,
+    including action type, duration_ms, and result summary.
+
+    Args:
+        team_id: Team ID or name (optional, auto-uses active team if empty)
+        agent_id: Filter by a specific Agent ID (optional, returns all agents if empty)
+        limit: Maximum number of records to return, default 20
+
+    Returns:
+        Activity list with agent_name, action, timestamp, duration_ms, etc.
+    """
+    resolved = _resolve_team_id(team_id)
+    if not resolved:
+        return {"success": False, "error": "未找到活跃团队，请提供 team_id 或先创建团队"}
+    params: list[str] = [f"limit={limit}"]
+    if agent_id:
+        params.append(f"agent_id={urllib.parse.quote(agent_id)}")
+    qs = "?" + "&".join(params)
+    return _api_call("GET", f"/api/teams/{resolved}/activities{qs}")
+
+
+# ============================================================
+# Tool: meeting_update
+# ============================================================
+
+
+@mcp.tool()
+def meeting_update(
+    meeting_id: str,
+    topic: str = "",
+    participants: list[str] | None = None,
+    notes: str = "",
+) -> dict[str, Any]:
+    """Update meeting fields (topic, participants, notes).
+
+    Use this to add conclusions/notes to a meeting or update its topic.
+    To formally conclude a meeting (mark as concluded), use meeting_conclude instead.
+
+    Args:
+        meeting_id: Meeting ID (required)
+        topic: New topic text (optional)
+        participants: Updated participant list (optional)
+        notes: Meeting notes or conclusion summary to store (optional)
+
+    Returns:
+        Updated meeting info
+    """
+    payload: dict[str, Any] = {}
+    if topic:
+        payload["topic"] = topic
+    if participants is not None:
+        payload["participants"] = participants
+    if notes:
+        payload["notes"] = notes
+    if not payload:
+        return {"success": False, "error": "至少需要提供一个更新字段（topic / participants / notes）"}
+    return _api_call("PUT", f"/api/meetings/{meeting_id}", payload)
+
+
+# ============================================================
 # Entry point
 # ============================================================
 
