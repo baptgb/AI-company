@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -42,9 +40,12 @@ def config_client(tmp_path):
     config_file.write_text(json.dumps(default, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # Patch配置路径
-    with patch.object(team_config, "CONFIG_DIR", config_dir), \
-         patch.object(team_config, "CONFIG_FILE", config_file):
+    with (
+        patch.object(team_config, "CONFIG_DIR", config_dir),
+        patch.object(team_config, "CONFIG_FILE", config_file),
+    ):
         from fastapi import FastAPI
+
         app = FastAPI()
         app.include_router(team_config.router)
         client = TestClient(app)

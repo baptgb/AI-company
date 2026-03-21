@@ -23,9 +23,7 @@ class MemoryBackend(Protocol):
         """Create a memory."""
         ...
 
-    async def search(
-        self, scope: str, scope_id: str, query: str, limit: int = 5
-    ) -> list[Memory]:
+    async def search(self, scope: str, scope_id: str, query: str, limit: int = 5) -> list[Memory]:
         """Search memories."""
         ...
 

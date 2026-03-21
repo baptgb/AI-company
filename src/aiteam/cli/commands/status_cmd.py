@@ -30,7 +30,9 @@ def status(
             teams = run_async(manager.list_teams())
 
             if not teams:
-                print_warning("暂无团队。使用 'aiteam team create' 创建团队，或 'aiteam init' 初始化项目。")
+                print_warning(
+                    "暂无团队。使用 'aiteam team create' 创建团队，或 'aiteam init' 初始化项目。"
+                )
                 return
 
             # Summary table

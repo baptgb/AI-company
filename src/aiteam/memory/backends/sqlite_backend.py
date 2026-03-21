@@ -26,9 +26,7 @@ class SqliteMemoryBackend:
         """Create a memory, delegating to StorageRepository."""
         return await self._repo.create_memory(scope, scope_id, content, metadata)
 
-    async def search(
-        self, scope: str, scope_id: str, query: str, limit: int = 5
-    ) -> list[Memory]:
+    async def search(self, scope: str, scope_id: str, query: str, limit: int = 5) -> list[Memory]:
         """Search memories, delegating to StorageRepository."""
         return await self._repo.search_memories(scope, scope_id, query, limit)
 

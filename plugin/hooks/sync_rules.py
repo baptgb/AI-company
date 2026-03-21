@@ -40,7 +40,7 @@ def sync_rules(claude_md_path: str = "CLAUDE.md") -> str:
         操作结果描述字符串
     """
     if os.path.exists(claude_md_path):
-        with open(claude_md_path, "r", encoding="utf-8") as f:
+        with open(claude_md_path, encoding="utf-8") as f:
             content = f.read()
 
         if START_MARKER in content:

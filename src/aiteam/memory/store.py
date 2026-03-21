@@ -163,15 +163,11 @@ class MemoryStore:
         all_memories: list[Memory] = []
 
         # Retrieve agent-level memories
-        agent_memories = await self.retrieve(
-            MemoryScope.AGENT.value, agent_id, task, limit=5
-        )
+        agent_memories = await self.retrieve(MemoryScope.AGENT.value, agent_id, task, limit=5)
         all_memories.extend(agent_memories)
 
         # Retrieve global-level memories
-        global_memories = await self.retrieve(
-            MemoryScope.GLOBAL.value, "system", task, limit=3
-        )
+        global_memories = await self.retrieve(MemoryScope.GLOBAL.value, "system", task, limit=3)
         all_memories.extend(global_memories)
 
         return build_context_string(all_memories)

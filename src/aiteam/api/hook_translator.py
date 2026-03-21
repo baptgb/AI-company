@@ -16,7 +16,9 @@ from aiteam.api.event_bus import EventBus
 from aiteam.storage.repository import StorageRepository
 
 # Agent standardized prompt template path
-_TEMPLATE_PATH = Path(__file__).resolve().parents[3] / "plugin" / "config" / "agent-prompt-template.md"
+_TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[3] / "plugin" / "config" / "agent-prompt-template.md"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +62,9 @@ class _FileEditTracker:
         )
 
     def find_conflicts(
-        self, file_path: str, current_agent_id: str,
+        self,
+        file_path: str,
+        current_agent_id: str,
         window_minutes: int = 5,
     ) -> list[_FileEditRecord]:
         """Find edit records from other agents that conflict with the current agent.
@@ -70,10 +74,7 @@ class _FileEditTracker:
         """
         cutoff = datetime.now() - timedelta(minutes=window_minutes)
         records = self._edits.get(file_path, [])
-        return [
-            r for r in records
-            if r.agent_id != current_agent_id and r.timestamp >= cutoff
-        ]
+        return [r for r in records if r.agent_id != current_agent_id and r.timestamp >= cutoff]
 
     def get_hotspots(self, window_minutes: int = 10, min_agents: int = 2) -> list[dict]:
         """Get hotspot files — files edited by multiple agents within the time window.
@@ -89,12 +90,14 @@ class _FileEditTracker:
                 continue
             unique_agents = {r.agent_name for r in recent}
             if len(unique_agents) >= min_agents:
-                hotspots.append({
-                    "file_path": file_path,
-                    "agents": sorted(unique_agents),
-                    "edit_count": len(recent),
-                    "last_edit": max(r.timestamp for r in recent).isoformat(),
-                })
+                hotspots.append(
+                    {
+                        "file_path": file_path,
+                        "agents": sorted(unique_agents),
+                        "edit_count": len(recent),
+                        "last_edit": max(r.timestamp for r in recent).isoformat(),
+                    }
+                )
         # Sort by edit count descending
         hotspots.sort(key=lambda h: h["edit_count"], reverse=True)
         return hotspots
@@ -104,10 +107,7 @@ class _FileEditTracker:
         cutoff = datetime.now() - timedelta(minutes=window_minutes)
         files = []
         for file_path, records in self._edits.items():
-            if any(
-                r.agent_id == agent_id and r.timestamp >= cutoff
-                for r in records
-            ):
+            if any(r.agent_id == agent_id and r.timestamp >= cutoff for r in records):
                 files.append(file_path)
         return files
 
@@ -225,7 +225,8 @@ class HookTranslator:
             else:
                 # No cc_team_name -> legacy compat: global lookup by session_id+name
                 existing = await self.repo.find_agent_by_session(
-                    session_id, agent_name,
+                    session_id,
+                    agent_name,
                 )
 
         # 3. Still no match -> find team via Leader, deduplicate by name within team
@@ -288,13 +289,16 @@ class HookTranslator:
         if late_match:
             existing = late_match[0]
             await self.repo.update_agent(
-                existing.id, status="busy", cc_tool_use_id=cc_agent_id,
+                existing.id,
+                status="busy",
+                cc_tool_use_id=cc_agent_id,
                 session_id=session_id,
                 last_active_at=datetime.now(),
             )
             logger.info(
                 "SubagentStart: concurrent dedup hit for agent '%s' (id=%s)",
-                agent_name, existing.id,
+                agent_name,
+                existing.id,
             )
             return {"status": "updated", "agent_id": existing.id}
 
@@ -361,7 +365,9 @@ class HookTranslator:
         )
         logger.info(
             "SubagentStart: auto-registered agent '%s' -> team '%s' (cc_id=%s)",
-            agent_name, team.name, cc_agent_id[:8] if cc_agent_id else "?",
+            agent_name,
+            team.name,
+            cc_agent_id[:8] if cc_agent_id else "?",
         )
         return {"status": "created", "agent_id": new_agent.id}
 
@@ -383,7 +389,8 @@ class HookTranslator:
                 # CC's SubagentStop only means "one turn ended", agent may still be working
                 # State changes are handled by StateReaper: 5min inactive->waiting, 30min->offline
                 await self.repo.update_agent(
-                    agent.id, last_active_at=datetime.now(),
+                    agent.id,
+                    last_active_at=datetime.now(),
                 )
                 updated.append(agent.id)
         else:
@@ -392,7 +399,8 @@ class HookTranslator:
             for agent in agents:
                 if agent.status == "busy":
                     await self.repo.update_agent(
-                        agent.id, last_active_at=datetime.now(),
+                        agent.id,
+                        last_active_at=datetime.now(),
                     )
                     updated.append(agent.id)
         return {"status": "updated", "agents_waiting": updated}
@@ -411,7 +419,9 @@ class HookTranslator:
         if existing_team:
             logger.info(
                 "CC team mapping: '%s' -> existing OS team (id=%s, status=%s)",
-                cc_team_name, existing_team.id, existing_team.status,
+                cc_team_name,
+                existing_team.id,
+                existing_team.status,
             )
             return existing_team
 
@@ -422,7 +432,8 @@ class HookTranslator:
         )
         logger.info(
             "CC team mapping: auto-created OS team '%s' (id=%s)",
-            cc_team_name, new_team.id,
+            cc_team_name,
+            new_team.id,
         )
 
         # Try to link to existing project (prefer via Leader, fallback to active project)
@@ -444,7 +455,8 @@ class HookTranslator:
             await self.repo.update_team(new_team.id, project_id=project_id)
             logger.info(
                 "CC team mapping: team '%s' linked to project %s",
-                cc_team_name, project_id,
+                cc_team_name,
+                project_id,
             )
 
         await self.event_bus.emit(
@@ -482,7 +494,7 @@ class HookTranslator:
                     return api_matches[0]
 
                 # Finally return any matching agent (BUSY first)
-                agents.sort(key=lambda a: (0 if a.status == "busy" else 1))
+                agents.sort(key=lambda a: 0 if a.status == "busy" else 1)
                 return agents[0]
 
         # 2. FALLBACK: cross-session lookup by role="leader"
@@ -507,7 +519,8 @@ class HookTranslator:
             await self.repo.update_agent(chosen.id, session_id=session_id)
             logger.info(
                 "Leader self-heal: '%s' session bound to %s",
-                chosen.name, session_id[:8],
+                chosen.name,
+                session_id[:8],
             )
 
         return chosen
@@ -559,8 +572,12 @@ class HookTranslator:
         return ""
 
     async def _check_file_edit_conflict(
-        self, tool_name: str, tool_input: dict | str,
-        target_agent_id: str, target_agent_name: str, session_id: str,
+        self,
+        tool_name: str,
+        tool_input: dict | str,
+        target_agent_id: str,
+        target_agent_name: str,
+        session_id: str,
     ) -> None:
         """Detect file edit conflicts — O(1) query via in-memory tracker + DB fallback.
 
@@ -585,13 +602,17 @@ class HookTranslator:
 
         # Use in-memory tracker to find conflicts (O(1) lookup)
         conflicts = self._file_tracker.find_conflicts(
-            file_path, target_agent_id, window_minutes=5,
+            file_path,
+            target_agent_id,
+            window_minutes=5,
         )
 
         if not conflicts:
             # In-memory tracker has no conflicts -> DB fallback (covers cold start after tracker restart)
             conflicts = await self._db_fallback_conflict_check(
-                file_path, target_agent_id, session_id,
+                file_path,
+                target_agent_id,
+                session_id,
             )
 
         if not conflicts:
@@ -627,21 +648,24 @@ class HookTranslator:
         agent_names = ", ".join(r.agent_name for r in seen_agents.values())
         logger.warning(
             "File edit conflict[%s]: %s — %s (prior) vs %s (current)",
-            severity, file_path, agent_names, target_agent_name,
+            severity,
+            file_path,
+            agent_names,
+            target_agent_name,
         )
 
     async def _db_fallback_conflict_check(
-        self, file_path: str, current_agent_id: str, session_id: str,
+        self,
+        file_path: str,
+        current_agent_id: str,
+        session_id: str,
     ) -> list[_FileEditRecord]:
         """DB fallback conflict detection — when in-memory tracker has no data (cold start).
 
         Improved: directly matches file_path instead of substring matching input_summary.
         """
         session_agents = await self.repo.find_agents_by_session(session_id)
-        other_busy = [
-            a for a in session_agents
-            if a.id != current_agent_id and a.status == "busy"
-        ]
+        other_busy = [a for a in session_agents if a.id != current_agent_id and a.status == "busy"]
         if not other_busy:
             return []
 
@@ -666,7 +690,9 @@ class HookTranslator:
                     conflicts.append(record)
                     # Also populate in-memory tracker
                     self._file_tracker.record(
-                        file_path, other.id, other.name,
+                        file_path,
+                        other.id,
+                        other.name,
                     )
                     break  # Only take most recent per agent
         return conflicts
@@ -685,7 +711,10 @@ class HookTranslator:
         return self._file_tracker.get_agent_files(agent_id)
 
     async def _resolve_agent(
-        self, cc_agent_id: str, agent_name: str, session_id: str,
+        self,
+        cc_agent_id: str,
+        agent_name: str,
+        session_id: str,
     ) -> object | None:
         """Resolve which agent a tool call belongs to — supports cc_id exact match + name fallback.
 
@@ -706,10 +735,7 @@ class HookTranslator:
                 team = await self.repo.find_active_team_by_leader(leader.id)
                 if team:
                     team_agents = await self.repo.list_agents(team.id)
-                    matches = [
-                        a for a in team_agents
-                        if a.name == agent_name and a.id != leader.id
-                    ]
+                    matches = [a for a in team_agents if a.name == agent_name and a.id != leader.id]
                     if matches:
                         agent = matches[0]
                         # Late binding: bind cc_tool_use_id to fix all subsequent lookups
@@ -720,7 +746,8 @@ class HookTranslator:
                         )
                         logger.info(
                             "Late binding: agent '%s' bound cc_id=%s",
-                            agent_name, cc_agent_id[:8],
+                            agent_name,
+                            cc_agent_id[:8],
                         )
                         return agent
 
@@ -755,7 +782,8 @@ class HookTranslator:
 
             # Update last active time
             await self.repo.update_agent(
-                target_agent.id, last_active_at=datetime.now(),
+                target_agent.id,
+                last_active_at=datetime.now(),
             )
 
             start_time = datetime.now()
@@ -774,10 +802,7 @@ class HookTranslator:
             # Intent event: only emit for substantive tools and when throttle threshold exceeded
             if tool_name in self._INTENT_TOOLS:
                 last_emit = self._intent_last_emit.get(target_agent.id)
-                elapsed = (
-                    (start_time - last_emit).total_seconds()
-                    if last_emit else float("inf")
-                )
+                elapsed = (start_time - last_emit).total_seconds() if last_emit else float("inf")
                 if elapsed >= self._INTENT_THROTTLE_SECS:
                     self._intent_last_emit[target_agent.id] = start_time
                     await self.event_bus.emit(
@@ -795,8 +820,11 @@ class HookTranslator:
             # File edit conflict detection (only records events, does not block operations)
             try:
                 await self._check_file_edit_conflict(
-                    tool_name, tool_input,
-                    target_agent.id, target_agent.name, session_id,
+                    tool_name,
+                    tool_input,
+                    target_agent.id,
+                    target_agent.name,
+                    session_id,
                 )
             except Exception as exc:
                 logger.warning("Conflict detection error (does not affect tool use): %s", exc)
@@ -937,7 +965,9 @@ class HookTranslator:
         project = None
         projects = await self.repo.list_projects()
         for proj in projects:
-            if proj.root_path and cwd.replace("\\", "/").startswith(proj.root_path.replace("\\", "/")):
+            if proj.root_path and cwd.replace("\\", "/").startswith(
+                proj.root_path.replace("\\", "/")
+            ):
                 project = proj
                 break
 
@@ -949,7 +979,9 @@ class HookTranslator:
             # Reuse existing session Leader
             leader = leaders_in_session[0]
             await self.repo.update_agent(
-                leader.id, status="busy", last_active_at=datetime.now(),
+                leader.id,
+                status="busy",
+                last_active_at=datetime.now(),
             )
         elif project:
             # 3. Find existing Leader in project (may be an old Leader with empty session_id)
@@ -963,7 +995,11 @@ class HookTranslator:
                     status="busy",
                     last_active_at=datetime.now(),
                 )
-                logger.info("SessionStart: reusing project Leader %s (session=%s)", leader.name, session_id[:8])
+                logger.info(
+                    "SessionStart: reusing project Leader %s (session=%s)",
+                    leader.name,
+                    session_id[:8],
+                )
             else:
                 # 4. Project has no Leader -> create one
                 team = await self._find_or_create_session_team(session_id, payload)
@@ -978,13 +1014,16 @@ class HookTranslator:
                         project_id=project.id,
                     )
                     await self.repo.update_agent(
-                        leader.id, status="busy", last_active_at=datetime.now(),
+                        leader.id,
+                        status="busy",
+                        last_active_at=datetime.now(),
                     )
                     logger.info("SessionStart: created project Leader -> team %s", team.name)
         else:
             # No project match -> auto-create project (using cwd as root_path)
             if cwd:
                 import os
+
                 dir_name = os.path.basename(cwd.rstrip("/\\")) or "Project"
                 project = await self.repo.create_project(
                     name=f"Project-{dir_name}",
@@ -1007,7 +1046,9 @@ class HookTranslator:
                     project_id=proj_id,
                 )
                 await self.repo.update_agent(
-                    leader.id, status="busy", last_active_at=datetime.now(),
+                    leader.id,
+                    status="busy",
+                    last_active_at=datetime.now(),
                 )
 
         await self.event_bus.emit(
@@ -1032,10 +1073,12 @@ class HookTranslator:
 
         # Reconciliation stats
         hook_count = await self.repo.count_agents_by_source(
-            source="hook", session_id=session_id,
+            source="hook",
+            session_id=session_id,
         )
         api_count = await self.repo.count_agents_by_source(
-            source="api", session_id=session_id,
+            source="api",
+            session_id=session_id,
         )
 
         # Close all active teams (session end = entire work session ended)
@@ -1091,7 +1134,8 @@ class HookTranslator:
                 if agent.created_at and agent.created_at > recent_cutoff:
                     continue  # Recently created agent, skip to prevent old Stop from overriding
                 await self.repo.update_agent(
-                    agent.id, last_active_at=datetime.now(),
+                    agent.id,
+                    last_active_at=datetime.now(),
                 )
                 updated.append(agent.id)
 
@@ -1111,7 +1155,9 @@ class HookTranslator:
                         if agent.last_active_at and agent.last_active_at < cutoff:
                             continue  # Outside time window, skip (may belong to another session)
                         await self.repo.update_agent(
-                            agent.id, status="offline", current_task=None,
+                            agent.id,
+                            status="offline",
+                            current_task=None,
                         )
                         await self.event_bus.emit(
                             "agent.status_changed",
@@ -1126,14 +1172,22 @@ class HookTranslator:
                         updated.append(agent.id)
 
         # Distinguish heartbeat updates from offline settings
-        session_agents = {a.id for a in agents if a.status == "busy" and a.source == "hook"} if agents else set()
+        session_agents = (
+            {a.id for a in agents if a.status == "busy" and a.source == "hook"} if agents else set()
+        )
         heartbeat_ids = [aid for aid in updated if aid in session_agents]
         offline_ids = [aid for aid in updated if aid not in session_agents]
-        logger.info("Stop event: %d heartbeat updates, %d agents set offline", len(heartbeat_ids), len(offline_ids))
+        logger.info(
+            "Stop event: %d heartbeat updates, %d agents set offline",
+            len(heartbeat_ids),
+            len(offline_ids),
+        )
         return {"status": "ok", "heartbeat_updates": heartbeat_ids, "agents_offline": offline_ids}
 
     async def _find_or_create_session_team(
-        self, session_id: str, payload: dict,
+        self,
+        session_id: str,
+        payload: dict,
     ):
         """Find team associated with session.
 
@@ -1156,7 +1210,9 @@ class HookTranslator:
             # 2a: try to find team belonging to the project matched by cwd
             projects = await self.repo.list_projects()
             for proj in projects:
-                if proj.root_path and cwd.replace("\\", "/").startswith(proj.root_path.replace("\\", "/")):
+                if proj.root_path and cwd.replace("\\", "/").startswith(
+                    proj.root_path.replace("\\", "/")
+                ):
                     proj_teams = [t for t in teams if t.project_id == proj.id]
                     if proj_teams:
                         return proj_teams[0]
@@ -1166,7 +1222,8 @@ class HookTranslator:
             # 2c: multiple teams can't determine, return most recently created (log warning)
             logger.warning(
                 "Cannot determine team affiliation (cwd=%s, teams=%d), falling back to most recently created team",
-                cwd, len(teams),
+                cwd,
+                len(teams),
             )
             return teams[0]
         if teams:

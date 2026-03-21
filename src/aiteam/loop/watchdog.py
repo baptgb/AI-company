@@ -116,7 +116,9 @@ class WatchdogChecker:
         return recovered
 
     async def recover_failed_tasks(
-        self, team_id: str, event_bus: "EventBus | None" = None,
+        self,
+        team_id: str,
+        event_bus: EventBus | None = None,
     ) -> list[dict[str, Any]]:
         """Selector-pattern failed task recovery.
 
@@ -148,7 +150,9 @@ class WatchdogChecker:
                 }
                 results.append(record)
                 logger.info(
-                    "失败任务重试: '%s' (retry=%d)", title, retry_count + 1,
+                    "失败任务重试: '%s' (retry=%d)",
+                    title,
+                    retry_count + 1,
                 )
             else:
                 # Exceeded retry limit: trigger failure alchemy, extract learning artifacts
@@ -177,7 +181,8 @@ class WatchdogChecker:
                     )
                 logger.warning(
                     "失败任务超过重试上限: '%s' (retry=%d)，需Leader介入",
-                    title, retry_count,
+                    title,
+                    retry_count,
                 )
 
         return results
@@ -195,22 +200,24 @@ class WatchdogChecker:
                 elapsed_minutes = (now - ref_time).total_seconds() / 60
 
                 if elapsed_minutes > AGENT_BUSY_TIMEOUT_MINUTES:
-                    alerts.append({
-                        "severity": "warning",
-                        "category": "agent",
-                        "title": f"Agent BUSY超时: {agent.name}",
-                        "description": (
-                            f"Agent '{agent.name}' 已处于BUSY状态 "
-                            f"{elapsed_minutes:.0f} 分钟（阈值 {AGENT_BUSY_TIMEOUT_MINUTES} 分钟）。"
-                            f"上次活动: {ref_time.isoformat()}"
-                        ),
-                        "suggested_action": (
-                            f"检查Agent '{agent.name}' 是否卡死，"
-                            "考虑通过StateReaper重置或手动设为IDLE"
-                        ),
-                        "agent_id": agent.id,
-                        "agent_name": agent.name,
-                    })
+                    alerts.append(
+                        {
+                            "severity": "warning",
+                            "category": "agent",
+                            "title": f"Agent BUSY超时: {agent.name}",
+                            "description": (
+                                f"Agent '{agent.name}' 已处于BUSY状态 "
+                                f"{elapsed_minutes:.0f} 分钟（阈值 {AGENT_BUSY_TIMEOUT_MINUTES} 分钟）。"
+                                f"上次活动: {ref_time.isoformat()}"
+                            ),
+                            "suggested_action": (
+                                f"检查Agent '{agent.name}' 是否卡死，"
+                                "考虑通过StateReaper重置或手动设为IDLE"
+                            ),
+                            "agent_id": agent.id,
+                            "agent_name": agent.name,
+                        }
+                    )
 
         return alerts
 
@@ -229,20 +236,20 @@ class WatchdogChecker:
                 elapsed_minutes = (now - task.created_at).total_seconds() / 60
 
                 if elapsed_minutes > TASK_PENDING_TIMEOUT_MINUTES:
-                    alerts.append({
-                        "severity": "warning",
-                        "category": "task",
-                        "title": f"任务长时间PENDING: {task.title}",
-                        "description": (
-                            f"任务 '{task.title}' 已等待 {elapsed_minutes:.0f} 分钟"
-                            f"（阈值 {TASK_PENDING_TIMEOUT_MINUTES} 分钟），"
-                            f"优先级: {task.priority}"
-                        ),
-                        "suggested_action": (
-                            "分配Agent执行此任务，或降低优先级"
-                        ),
-                        "task_id": task.id,
-                    })
+                    alerts.append(
+                        {
+                            "severity": "warning",
+                            "category": "task",
+                            "title": f"任务长时间PENDING: {task.title}",
+                            "description": (
+                                f"任务 '{task.title}' 已等待 {elapsed_minutes:.0f} 分钟"
+                                f"（阈值 {TASK_PENDING_TIMEOUT_MINUTES} 分钟），"
+                                f"优先级: {task.priority}"
+                            ),
+                            "suggested_action": ("分配Agent执行此任务，或降低优先级"),
+                            "task_id": task.id,
+                        }
+                    )
 
             # Check BLOCKED tasks whose dependencies are all completed
             if task.status == TaskStatus.BLOCKED and task.depends_on:
@@ -256,19 +263,18 @@ class WatchdogChecker:
                         break
 
                 if deps_all_done:
-                    alerts.append({
-                        "severity": "warning",
-                        "category": "task",
-                        "title": f"任务可解除阻塞: {task.title}",
-                        "description": (
-                            f"任务 '{task.title}' 状态为BLOCKED，"
-                            "但所有依赖任务已完成"
-                        ),
-                        "suggested_action": (
-                            "将此任务状态从BLOCKED更新为PENDING"
-                        ),
-                        "task_id": task.id,
-                    })
+                    alerts.append(
+                        {
+                            "severity": "warning",
+                            "category": "task",
+                            "title": f"任务可解除阻塞: {task.title}",
+                            "description": (
+                                f"任务 '{task.title}' 状态为BLOCKED，但所有依赖任务已完成"
+                            ),
+                            "suggested_action": ("将此任务状态从BLOCKED更新为PENDING"),
+                            "task_id": task.id,
+                        }
+                    )
 
         return alerts
 
@@ -280,13 +286,15 @@ class WatchdogChecker:
         try:
             await self._repo.list_teams()
         except Exception as e:
-            alerts.append({
-                "severity": "critical",
-                "category": "system",
-                "title": "数据库连接异常",
-                "description": f"无法查询数据库: {e}",
-                "suggested_action": "检查数据库配置和连接状态",
-            })
+            alerts.append(
+                {
+                    "severity": "critical",
+                    "category": "system",
+                    "title": "数据库连接异常",
+                    "description": f"无法查询数据库: {e}",
+                    "suggested_action": "检查数据库配置和连接状态",
+                }
+            )
 
         return alerts
 
@@ -365,7 +373,8 @@ class WatchdogRunner:
 
             # Failed task retry/alert
             failed_results = await self._checker.recover_failed_tasks(
-                team.id, event_bus=self._event_bus,
+                team.id,
+                event_bus=self._event_bus,
             )
             for record in failed_results:
                 if record.get("action") == "retried":

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import socket
-import threading
 from unittest.mock import patch
 
-from aiteam.mcp.server import _is_port_open, _ensure_api_running
+from aiteam.mcp.server import _ensure_api_running, _is_port_open
 
 
 def test_is_port_open_returns_false():

@@ -11,7 +11,6 @@ import json
 import os
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
@@ -21,13 +20,12 @@ _hooks_dir = str(Path(__file__).resolve().parents[2] / "plugin" / "hooks")
 if _hooks_dir not in sys.path:
     sys.path.insert(0, _hooks_dir)
 
-from send_event import _resolve_cc_team_name
+from send_event import _resolve_cc_team_name  # noqa: E402
 
-from aiteam.api.event_bus import EventBus
-from aiteam.api.hook_translator import HookTranslator
-from aiteam.storage.connection import close_db
-from aiteam.storage.repository import StorageRepository
-
+from aiteam.api.event_bus import EventBus  # noqa: E402
+from aiteam.api.hook_translator import HookTranslator  # noqa: E402
+from aiteam.storage.connection import close_db  # noqa: E402
+from aiteam.storage.repository import StorageRepository  # noqa: E402
 
 # ============================================================
 # send_event._resolve_cc_team_name tests
@@ -50,7 +48,8 @@ class TestResolveCCTeamName:
             "members": [],
         }
         (teams_dir / "config.json").write_text(
-            json.dumps(config), encoding="utf-8",
+            json.dumps(config),
+            encoding="utf-8",
         )
 
         # Monkey-patch expanduser to use tmp_path
@@ -78,7 +77,8 @@ class TestResolveCCTeamName:
             "members": [],
         }
         (teams_dir / "config.json").write_text(
-            json.dumps(config), encoding="utf-8",
+            json.dumps(config),
+            encoding="utf-8",
         )
 
         original = os.path.expanduser
@@ -126,7 +126,8 @@ class TestResolveCCTeamName:
             "members": [],
         }
         (good_dir / "config.json").write_text(
-            json.dumps(config), encoding="utf-8",
+            json.dumps(config),
+            encoding="utf-8",
         )
 
         original = os.path.expanduser

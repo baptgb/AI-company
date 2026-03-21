@@ -2,6 +2,7 @@
 
 使用Python urllib发送请求，不依赖第三方库。
 """
+
 from __future__ import annotations
 
 import json
@@ -56,7 +57,9 @@ def check(
 ) -> bool:
     """记录并打印一条测试结果."""
     status_ok = status == expected_status
-    body_str = json.dumps(body, ensure_ascii=False)[:200] if not isinstance(body, str) else body[:200]
+    body_str = (
+        json.dumps(body, ensure_ascii=False)[:200] if not isinstance(body, str) else body[:200]
+    )
 
     assertion_failures: list[str] = []
     if assertions and status_ok:
@@ -77,13 +80,15 @@ def check(
     if not passed:
         print(f"       响应: {body_str}")
 
-    results.append({
-        "label": label,
-        "passed": passed,
-        "status": status,
-        "expected_status": expected_status,
-        "fail_reason": fail_reason,
-    })
+    results.append(
+        {
+            "label": label,
+            "passed": passed,
+            "status": status,
+            "expected_status": expected_status,
+            "fail_reason": fail_reason,
+        }
+    )
     return passed
 
 
@@ -91,9 +96,9 @@ def check(
 # 第一步：获取基础数据（team_id、project_id）
 # ================================================================
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("【第1组】核心API端点测试")
-print("="*60)
+print("=" * 60)
 
 # 1. GET /api/teams
 status, body = req("GET", "/api/teams")
@@ -138,9 +143,9 @@ check("GET /api/decisions?limit=10 — 决策日志", status, body, 200)
 # 第二组：MCP工具端点
 # ================================================================
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("【第2组】MCP工具端点 / Hook事件")
-print("="*60)
+print("=" * 60)
 
 # 8. POST /api/hooks/event
 hook_payload = {
@@ -159,9 +164,9 @@ if status == 202:
 # 第三组：会议系统测试
 # ================================================================
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("【第3组】会议系统")
-print("="*60)
+print("=" * 60)
 
 meeting_id = None
 if team_id:
@@ -203,15 +208,23 @@ if team_id:
 else:
     print("SKIP | 会议系统测试 (无可用team_id)")
     for _ in range(4):
-        results.append({"label": "会议系统-跳过", "passed": None, "status": 0, "expected_status": 0, "fail_reason": "无team_id"})
+        results.append(
+            {
+                "label": "会议系统-跳过",
+                "passed": None,
+                "status": 0,
+                "expected_status": 0,
+                "fail_reason": "无team_id",
+            }
+        )
 
 # ================================================================
 # 第四组：任务系统
 # ================================================================
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("【第4组】任务系统")
-print("="*60)
+print("=" * 60)
 
 task_id = None
 if team_id:
@@ -248,15 +261,23 @@ if team_id:
 else:
     print("SKIP | 任务系统测试 (无可用team_id)")
     for _ in range(4):
-        results.append({"label": "任务系统-跳过", "passed": None, "status": 0, "expected_status": 0, "fail_reason": "无team_id"})
+        results.append(
+            {
+                "label": "任务系统-跳过",
+                "passed": None,
+                "status": 0,
+                "expected_status": 0,
+                "fail_reason": "无team_id",
+            }
+        )
 
 # ================================================================
 # 第五组：新功能 — 单个模板、活动追踪、智能匹配
 # ================================================================
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("【第5组】新功能")
-print("="*60)
+print("=" * 60)
 
 # 17. GET /api/agent-templates/{name}
 status, body = req("GET", "/api/agent-templates/engineering-frontend-developer")
@@ -275,15 +296,23 @@ if team_id:
 else:
     print("SKIP | 活动追踪和智能匹配 (无可用team_id)")
     for _ in range(2):
-        results.append({"label": "新功能-跳过", "passed": None, "status": 0, "expected_status": 0, "fail_reason": "无team_id"})
+        results.append(
+            {
+                "label": "新功能-跳过",
+                "passed": None,
+                "status": 0,
+                "expected_status": 0,
+                "fail_reason": "无team_id",
+            }
+        )
 
 # ================================================================
 # 第六组：边界条件和异常场景
 # ================================================================
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("【第6组】边界条件 / 异常场景")
-print("="*60)
+print("=" * 60)
 
 # 20. 不存在的项目task-wall
 status, body = req("GET", "/api/projects/nonexistent-id-00000000/task-wall")
@@ -316,7 +345,15 @@ status, body = req("GET", "/api/agent-templates/../../etc/passwd")
 traversal_blocked = status in (200, 400, 404, 422)
 marker = "PASS" if traversal_blocked else "FAIL"
 print(f"{marker} | GET /api/agent-templates/路径遍历 — 期望被拦截(实际{status})")
-results.append({"label": "路径遍历防护", "passed": traversal_blocked, "status": status, "expected_status": -1, "fail_reason": ""})
+results.append(
+    {
+        "label": "路径遍历防护",
+        "passed": traversal_blocked,
+        "status": status,
+        "expected_status": -1,
+        "fail_reason": "",
+    }
+)
 
 # 25. Hook事件缺少必要字段（期望422）
 status, body = req("POST", "/api/hooks/event", {})
@@ -326,16 +363,18 @@ check("POST /api/hooks/event 空body — 期望422", status, body, expected_stat
 # 汇总报告
 # ================================================================
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("【测试汇总】")
-print("="*60)
+print("=" * 60)
 
 passed_count = sum(1 for r in results if r["passed"] is True)
 failed_count = sum(1 for r in results if r["passed"] is False)
 skipped_count = sum(1 for r in results if r["passed"] is None)
 total_count = len(results)
 
-print(f"\n通过: {passed_count} | 失败: {failed_count} | 跳过: {skipped_count} | 总计: {total_count}")
+print(
+    f"\n通过: {passed_count} | 失败: {failed_count} | 跳过: {skipped_count} | 总计: {total_count}"
+)
 
 if failed_count > 0:
     print("\n失败详情:")

@@ -542,10 +542,25 @@ def test_task_wall_sorting(integration_client):
     # 创建不同优先级和时间范围的任务
     tasks_spec = [
         {"title": "Low-short", "description": "低优先短期", "priority": "low", "horizon": "short"},
-        {"title": "Critical-short", "description": "关键短期", "priority": "critical", "horizon": "short"},
+        {
+            "title": "Critical-short",
+            "description": "关键短期",
+            "priority": "critical",
+            "horizon": "short",
+        },
         {"title": "High-mid", "description": "高优先中期", "priority": "high", "horizon": "mid"},
-        {"title": "Medium-long", "description": "中优先长期", "priority": "medium", "horizon": "long"},
-        {"title": "High-short", "description": "高优先短期", "priority": "high", "horizon": "short"},
+        {
+            "title": "Medium-long",
+            "description": "中优先长期",
+            "priority": "medium",
+            "horizon": "long",
+        },
+        {
+            "title": "High-short",
+            "description": "高优先短期",
+            "priority": "high",
+            "horizon": "short",
+        },
     ]
 
     for spec in tasks_spec:

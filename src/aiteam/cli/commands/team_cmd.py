@@ -13,7 +13,9 @@ app = typer.Typer(name="team", help="团队管理")
 @app.command("create")
 def create(
     name: str = typer.Option(..., "--name", "-n", help="团队名称"),
-    mode: str = typer.Option("coordinate", "--mode", "-m", help="编排模式 (coordinate/broadcast/route/meet)"),
+    mode: str = typer.Option(
+        "coordinate", "--mode", "-m", help="编排模式 (coordinate/broadcast/route/meet)"
+    ),
 ) -> None:
     """Create a new team."""
     try:
@@ -79,7 +81,9 @@ def delete(
 @app.command("set-mode")
 def set_mode(
     name: str = typer.Argument(help="团队名称或ID"),
-    mode: str = typer.Option(..., "--mode", "-m", help="编排模式 (coordinate/broadcast/route/meet)"),
+    mode: str = typer.Option(
+        ..., "--mode", "-m", help="编排模式 (coordinate/broadcast/route/meet)"
+    ),
 ) -> None:
     """Set team orchestration mode."""
     try:

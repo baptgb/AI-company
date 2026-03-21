@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -230,21 +228,17 @@ def test_efficiency_with_tasks(app_client):
 
     # 创建几个任务并完成部分
     import asyncio
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     repo = deps._repository
 
     async def add_tasks():
         t1 = await repo.create_task(team_id, "任务1", assigned_to=agent_id)
         t2 = await repo.create_task(team_id, "任务2", assigned_to=agent_id)
-        t3 = await repo.create_task(team_id, "任务3")
+        await repo.create_task(team_id, "任务3")
         # 完成t1和t2
-        await repo.update_task(
-            t1.id, status="completed", completed_at=datetime.now()
-        )
-        await repo.update_task(
-            t2.id, status="completed", completed_at=datetime.now()
-        )
+        await repo.update_task(t1.id, status="completed", completed_at=datetime.now())
+        await repo.update_task(t2.id, status="completed", completed_at=datetime.now())
 
     asyncio.get_event_loop().run_until_complete(add_tasks())
 

@@ -130,10 +130,14 @@ class StateReaper:
         # Heartbeat timeout -> set to OFFLINE
         logger.warning(
             "Hook-agent heartbeat timeout: %s (team=%s), %.0fs inactive, setting to OFFLINE",
-            agent.name, agent.team_id, elapsed,
+            agent.name,
+            agent.team_id,
+            elapsed,
         )
         await self._repo.update_agent(
-            agent.id, status=AgentStatus.OFFLINE.value, current_task=None,
+            agent.id,
+            status=AgentStatus.OFFLINE.value,
+            current_task=None,
         )
         await self._event_bus.emit(
             "agent.status_changed",
@@ -169,10 +173,13 @@ class StateReaper:
         # Timeout -> set to WAITING
         logger.warning(
             "Api-agent timeout: %s, %.0fs inactive, setting to WAITING",
-            agent.name, elapsed,
+            agent.name,
+            elapsed,
         )
         await self._repo.update_agent(
-            agent.id, status=AgentStatus.WAITING.value, current_task=None,
+            agent.id,
+            status=AgentStatus.WAITING.value,
+            current_task=None,
         )
         await self._event_bus.emit(
             "agent.status_changed",
@@ -196,7 +203,6 @@ class StateReaper:
         Applies when user executes TeamDelete and OS needs to sync quickly.
         """
         from pathlib import Path
-        import json as _json
 
         teams_dir = Path.home() / ".claude" / "teams"
         if not teams_dir.exists():
@@ -224,7 +230,9 @@ class StateReaper:
             for agent in agents:
                 if agent.status != "offline":
                     await self._repo.update_agent(
-                        agent.id, status="offline", current_task=None,
+                        agent.id,
+                        status="offline",
+                        current_task=None,
                     )
             await self._event_bus.emit(
                 "team.status_changed",
@@ -239,7 +247,8 @@ class StateReaper:
             )
             logger.info(
                 "Config probe: CC team '%s' deleted, OS team set to completed (%d agents->offline)",
-                team.name, len(agents),
+                team.name,
+                len(agents),
             )
 
     async def _check_stale_teams(self, now: datetime) -> None:
@@ -249,7 +258,6 @@ class StateReaper:
         Also detects whether CC team config files have been deleted
         (OS should follow suit after CC TeamDelete).
         """
-        import os
         from pathlib import Path
 
         stale_threshold = now - timedelta(minutes=30)
@@ -295,7 +303,8 @@ class StateReaper:
                             await self._repo.update_agent(agent.id, status="offline")
                     logger.info(
                         "StateReaper: CC team deleted, closing OS team '%s' (%d agents->offline)",
-                        team.name, len(agents),
+                        team.name,
+                        len(agents),
                     )
 
     async def _check_loop_auto_advance(self) -> None:
@@ -348,8 +357,8 @@ class StateReaper:
 
     async def _check_agent_liveness(self) -> None:
         """Detect agent liveness based on CC team config."""
-        from pathlib import Path
         import json as _json
+        from pathlib import Path
 
         teams_dir = Path.home() / ".claude" / "teams"
         if not teams_dir.exists():
@@ -387,7 +396,9 @@ class StateReaper:
                 # busy/waiting agent not in any team config -> offline
                 if agent.name not in alive_names:
                     await self._repo.update_agent(
-                        agent.id, status=AgentStatus.OFFLINE.value, current_task=None,
+                        agent.id,
+                        status=AgentStatus.OFFLINE.value,
+                        current_task=None,
                     )
                     await self._event_bus.emit(
                         "agent.status_changed",
@@ -400,7 +411,8 @@ class StateReaper:
                         },
                     )
                     logger.info(
-                        "Config probe: %s not in CC team members -> offline", agent.name,
+                        "Config probe: %s not in CC team members -> offline",
+                        agent.name,
                     )
 
     async def _check_meeting_expiry(self, now: datetime) -> None:
@@ -413,7 +425,8 @@ class StateReaper:
 
         for team in teams:
             meetings = await self._repo.list_meetings(
-                team.id, status=MeetingStatus.ACTIVE,
+                team.id,
+                status=MeetingStatus.ACTIVE,
             )
             for meeting in meetings:
                 # Get meeting messages, take the latest one's timestamp
@@ -430,7 +443,9 @@ class StateReaper:
                 if last_msg_time < expiry_threshold:
                     logger.warning(
                         "Meeting expired: %s (topic=%s), last message at %s, auto-concluding",
-                        meeting.id, meeting.topic, last_msg_time,
+                        meeting.id,
+                        meeting.topic,
+                        last_msg_time,
                     )
                     await self._repo.update_meeting(
                         meeting.id,
@@ -446,7 +461,8 @@ class StateReaper:
                             "team_id": team.id,
                             "trigger": "expiry_reaper",
                             "hours_inactive": round(
-                                (now - last_msg_time).total_seconds() / 3600, 1,
+                                (now - last_msg_time).total_seconds() / 3600,
+                                1,
                             ),
                         },
                     )

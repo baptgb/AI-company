@@ -42,8 +42,10 @@ def templates_client(tmp_path):
     }
     templates_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    with patch.object(templates, "CONFIG_DIR", config_dir), \
-         patch.object(templates, "TEMPLATES_FILE", templates_file):
+    with (
+        patch.object(templates, "CONFIG_DIR", config_dir),
+        patch.object(templates, "TEMPLATES_FILE", templates_file),
+    ):
         app = FastAPI()
         app.include_router(templates.router)
         client = TestClient(app)

@@ -66,9 +66,7 @@ class TestLoadConfig:
     def test_load_from_file(self, tmp_path: Path) -> None:
         """从YAML文件加载配置."""
         config_path = tmp_path / CONFIG_FILENAME
-        config_path.write_text(
-            generate_default_config(), encoding="utf-8"
-        )
+        config_path.write_text(generate_default_config(), encoding="utf-8")
         config = load_config(config_path)
         assert config.project.name == "my-project"
         assert config.infrastructure.storage_backend == "sqlite"
@@ -127,16 +125,12 @@ class TestConfigValidation:
     def test_invalid_max_context_ratio(self) -> None:
         """max_context_ratio超出范围应报错."""
         with pytest.raises(ValidationError):
-            ProjectConfig.model_validate({
-                "defaults": {"max_context_ratio": 1.5}
-            })
+            ProjectConfig.model_validate({"defaults": {"max_context_ratio": 1.5}})
 
     def test_invalid_storage_backend(self) -> None:
         """无效的storage_backend应报错."""
         with pytest.raises(ValidationError):
-            ProjectConfig.model_validate({
-                "infrastructure": {"storage_backend": "mongodb"}
-            })
+            ProjectConfig.model_validate({"infrastructure": {"storage_backend": "mongodb"}})
 
 
 class TestFindConfigFile:
@@ -211,8 +205,6 @@ class TestConfigDefaults:
 
     def test_get_db_url_custom(self) -> None:
         """自定义db_url优先级最高."""
-        config = ProjectConfig.model_validate({
-            "infrastructure": {"db_url": "postgresql://custom"}
-        })
+        config = ProjectConfig.model_validate({"infrastructure": {"db_url": "postgresql://custom"}})
         url = config.infrastructure.get_db_url(Path("/dummy"))
         assert url == "postgresql://custom"

@@ -12,9 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-_SUPERVISOR_STATE_DIR = os.path.join(
-    os.path.expanduser("~"), ".claude", "data", "ai-team-os"
-)
+_SUPERVISOR_STATE_DIR = os.path.join(os.path.expanduser("~"), ".claude", "data", "ai-team-os")
 _SUPERVISOR_STATE_FILE = os.path.join(_SUPERVISOR_STATE_DIR, "supervisor-state.json")
 
 # Threshold for Leader delegation check
@@ -30,7 +28,7 @@ _DELEGATION_TOOLS = {"Agent", "TeamCreate", "SendMessage"}
 def _load_supervisor_state() -> dict:
     """Load supervisor state file; return default value if missing or corrupted."""
     try:
-        with open(_SUPERVISOR_STATE_FILE, "r", encoding="utf-8") as f:
+        with open(_SUPERVISOR_STATE_FILE, encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
@@ -66,8 +64,18 @@ def _check_agent_team_name(event_data: dict) -> str | None:
 
     # Check if implementation keywords are present
     impl_keywords = [
-        "write", "create", "implement", "edit", "fix", "build",
-        "开发", "实现", "修复", "编写", "创建", "构建",
+        "write",
+        "create",
+        "implement",
+        "edit",
+        "fix",
+        "build",
+        "开发",
+        "实现",
+        "修复",
+        "编写",
+        "创建",
+        "构建",
     ]
     has_impl = any(kw in tool_input for kw in impl_keywords)
 
@@ -113,6 +121,7 @@ def _check_leader_doing_too_much(event_data: dict, state: dict) -> str | None:
 def _team_has_required_roles(team_name: str) -> bool:
     """Check if team config already has QA and bug-fixer roles."""
     import json as _json
+
     config_path = Path.home() / ".claude" / "teams" / team_name / "config.json"
     if not config_path.exists():
         return False
@@ -208,6 +217,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
     if tool_name == "TeamDelete":
         try:
             import urllib.request
+
             api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
             # Close all active teams (TeamDelete means current team work is done)
             req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
@@ -229,6 +239,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
     if tool_name == "TeamCreate":
         try:
             import urllib.request
+
             api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
             req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
             with urllib.request.urlopen(req, timeout=2) as resp:
@@ -248,6 +259,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
     if tool_name == "SendMessage":
         try:
             import urllib.request
+
             api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
             req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
             with urllib.request.urlopen(req, timeout=2) as resp:
@@ -257,27 +269,29 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                 team_id = active_teams[0].get("id", "")
                 if team_id:
                     req2 = urllib.request.Request(
-                        f"{api_url}/api/teams/{team_id}/agents", method="GET",
+                        f"{api_url}/api/teams/{team_id}/agents",
+                        method="GET",
                     )
                     with urllib.request.urlopen(req2, timeout=2) as resp2:
                         agents = json.loads(resp2.read().decode("utf-8")).get("data", [])
                     non_leader_agents = [a for a in agents if a.get("role") != "leader"]
                     busy_count = sum(1 for a in non_leader_agents if a.get("status") == "busy")
                     idle_agents = [
-                        a for a in non_leader_agents
-                        if a.get("status") in ("waiting", "offline")
+                        a for a in non_leader_agents if a.get("status") in ("waiting", "offline")
                     ]
                     if busy_count < 3 and idle_agents:
                         # Try to fetch pending tasks for matching suggestions
                         match_hints: list[str] = []
                         try:
                             req3 = urllib.request.Request(
-                                f"{api_url}/api/teams/{team_id}/tasks", method="GET",
+                                f"{api_url}/api/teams/{team_id}/tasks",
+                                method="GET",
                             )
                             with urllib.request.urlopen(req3, timeout=2) as resp3:
                                 tasks = json.loads(resp3.read().decode("utf-8")).get("data", [])
                             pending_tasks = [
-                                t for t in tasks
+                                t
+                                for t in tasks
                                 if t.get("status") in ("pending",) and not t.get("assigned_to")
                             ]
                             for idle in idle_agents[:3]:  # Show at most 3 idle Agents
@@ -286,7 +300,8 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                                 # Find tasks whose tags overlap with agent role
                                 matched = next(
                                     (
-                                        t for t in pending_tasks
+                                        t
+                                        for t in pending_tasks
                                         if any(
                                             tag.lower() in agent_role or agent_role in tag.lower()
                                             for tag in (t.get("tags") or [])
@@ -297,7 +312,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                                 if matched:
                                     tags_str = ",".join(matched.get("tags") or [])
                                     hint = (
-                                        f"空闲Agent: {agent_name}({idle.get('role','')}), "
+                                        f"空闲Agent: {agent_name}({idle.get('role', '')}), "
                                         f"待办: {matched['title']}"
                                         + (f"(tags:{tags_str})" if tags_str else "")
                                         + " → 建议分配"
@@ -326,8 +341,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
         if last_view > 0 and (now - last_view) > 900:
             minutes = int((now - last_view) / 60)
             warnings.append(
-                f"[OS提醒] 距上次查看任务墙已{minutes}分钟。"
-                "→ 建议 taskwall_view 查看当前任务状态"
+                f"[OS提醒] 距上次查看任务墙已{minutes}分钟。→ 建议 taskwall_view 查看当前任务状态"
             )
             state["last_taskwall_view"] = now
 
@@ -341,6 +355,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
         if is_completion and not is_shutdown:
             try:
                 import urllib.request
+
                 api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
                 req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
                 with urllib.request.urlopen(req, timeout=2) as resp:
@@ -350,18 +365,18 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
                     team_id = active_teams[0].get("id", "")
                     if team_id:
                         req2 = urllib.request.Request(
-                            f"{api_url}/api/teams/{team_id}/tasks", method="GET",
+                            f"{api_url}/api/teams/{team_id}/tasks",
+                            method="GET",
                         )
                         with urllib.request.urlopen(req2, timeout=2) as resp2:
                             tasks = json.loads(resp2.read().decode("utf-8")).get("data", [])
                         pending = [
-                            t for t in tasks
+                            t
+                            for t in tasks
                             if t.get("status") == "pending" and not t.get("assigned_to")
                         ]
                         if pending:
-                            pending_titles = "、".join(
-                                t["title"] for t in pending[:3]
-                            )
+                            pending_titles = "、".join(t["title"] for t in pending[:3])
                             more = f"等{len(pending)}个" if len(pending) > 3 else ""
                             warnings.append(
                                 f"[OS提醒] Agent已完成汇报，仍有待分配任务：{pending_titles}{more}。"
@@ -390,8 +405,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
         input_str = str(event_data.get("tool_input", {}))
         if "completed" in input_str.lower():
             warnings.append(
-                "[OS提醒] 任务标记完成。是否涉及系统行为变更？"
-                "→ 如是，请通知QA Agent进行验收测试"
+                "[OS提醒] 任务标记完成。是否涉及系统行为变更？→ 如是，请通知QA Agent进行验收测试"
             )
 
     # 13. Bottleneck detection: remind to hold meeting when all tasks done or many blocked
@@ -401,6 +415,7 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
     if bottleneck_count % 50 == 0:
         try:
             import urllib.request
+
             api_url = os.environ.get("AITEAM_API_URL", "http://localhost:8000")
             req = urllib.request.Request(f"{api_url}/api/teams", method="GET")
             with urllib.request.urlopen(req, timeout=2) as resp:
@@ -426,7 +441,10 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
     if tool_name == "SendMessage":
         input_str = str(event_data.get("tool_input", {}))
         completion_keywords = ["完成", "completed", "done", "finished", "汇报"]
-        if any(kw in input_str.lower() for kw in completion_keywords) and "shutdown" not in input_str.lower():
+        if (
+            any(kw in input_str.lower() for kw in completion_keywords)
+            and "shutdown" not in input_str.lower()
+        ):
             required_fields = ["完成内容", "修改文件", "测试结果"]
             missing = [f for f in required_fields if f not in input_str]
             if missing and len(input_str) > 100:  # Only check longer reports
@@ -449,24 +467,16 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
             sys.exit(2)
         # Recursive delete of other dangerous targets -> warning
         if re.search(r"rm\s+-[^\s]*r[^\s]*\s+\*", cmd):
-            warnings.append(
-                "[安全] 危险：检测到递归删除通配符命令，请确认操作目标"
-            )
+            warnings.append("[安全] 危险：检测到递归删除通配符命令，请确认操作目标")
         # Destructive database operations
         if re.search(r"\b(DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE)\b", cmd, re.IGNORECASE):
-            warnings.append(
-                "[安全] 危险：检测到数据库破坏性操作（DROP/TRUNCATE），请确认"
-            )
+            warnings.append("[安全] 危险：检测到数据库破坏性操作（DROP/TRUNCATE），请确认")
         # force push
         if "push" in cmd_lower and "--force" in cmd_lower:
-            warnings.append(
-                "[安全] 注意：检测到force push，可能覆盖远程历史"
-            )
+            warnings.append("[安全] 注意：检测到force push，可能覆盖远程历史")
         # Overly permissive file permissions
         if "chmod 777" in cmd:
-            warnings.append(
-                "[安全] 安全：过度开放的文件权限（chmod 777），建议使用更严格的权限"
-            )
+            warnings.append("[安全] 安全：过度开放的文件权限（chmod 777），建议使用更严格的权限")
         # S3: Sensitive file commit interception (git add) -> exit(2) hard block
         if "git add" in cmd_lower:
             block_patterns = [".env", "id_rsa", ".pem", ".key"]
@@ -491,15 +501,11 @@ def _check_workflow_reminders(event_data: dict, state: dict) -> list[str]:
             content,
             re.IGNORECASE,
         ):
-            warnings.append(
-                "[安全] 安全：检测到可能的硬编码密钥，建议使用环境变量"
-            )
+            warnings.append("[安全] 安全：检测到可能的硬编码密钥，建议使用环境变量")
         # .env file write reminder
         file_path = tool_input.get("file_path", "")
         if file_path.endswith(".env") or "/.env" in file_path or "\\.env" in file_path:
-            warnings.append(
-                "[安全] 注意：.env文件不应提交到版本库，请确认.gitignore包含.env"
-            )
+            warnings.append("[安全] 注意：.env文件不应提交到版本库，请确认.gitignore包含.env")
 
     return warnings
 

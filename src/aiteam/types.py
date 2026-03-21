@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 # ============================================================
 
 
-class OrchestrationMode(str, enum.Enum):
+class OrchestrationMode(enum.StrEnum):
     """Team orchestration mode."""
 
     COORDINATE = "coordinate"
@@ -29,7 +29,7 @@ class OrchestrationMode(str, enum.Enum):
     MEET = "meet"
 
 
-class TaskStatus(str, enum.Enum):
+class TaskStatus(enum.StrEnum):
     """Task status."""
 
     PENDING = "pending"
@@ -39,22 +39,22 @@ class TaskStatus(str, enum.Enum):
     FAILED = "failed"
 
 
-class AgentStatus(str, enum.Enum):
+class AgentStatus(enum.StrEnum):
     """Agent status — three-state model."""
 
-    BUSY = "busy"        # Working — actively executing tool calls
+    BUSY = "busy"  # Working — actively executing tool calls
     WAITING = "waiting"  # Waiting — alive but awaiting input (between turns)
     OFFLINE = "offline"  # Offline — terminated
 
 
-class MeetingStatus(str, enum.Enum):
+class MeetingStatus(enum.StrEnum):
     """Meeting status."""
 
     ACTIVE = "active"
     CONCLUDED = "concluded"
 
 
-class PhaseStatus(str, enum.Enum):
+class PhaseStatus(enum.StrEnum):
     """Phase status."""
 
     PLANNING = "planning"
@@ -63,7 +63,7 @@ class PhaseStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
-class TeamStatus(str, enum.Enum):
+class TeamStatus(enum.StrEnum):
     """Team lifecycle status."""
 
     ACTIVE = "active"
@@ -71,20 +71,20 @@ class TeamStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
-class MeetingTemplate(str, enum.Enum):
+class MeetingTemplate(enum.StrEnum):
     """Meeting template type."""
 
-    BRAINSTORM = "brainstorm"          # Brainstorming (4 rounds)
-    DECISION = "decision"              # Decision meeting (3 rounds)
-    REVIEW = "review"                  # Review meeting (3 rounds)
-    RETROSPECTIVE = "retrospective"    # Retrospective meeting (3 rounds)
-    STANDUP = "standup"                # Standup (1 round)
-    DEBATE = "debate"                  # Debate mode
-    LEAN_COFFEE = "lean_coffee"        # Lean Coffee
-    FREE = "free"                      # Free discussion (default)
+    BRAINSTORM = "brainstorm"  # Brainstorming (4 rounds)
+    DECISION = "decision"  # Decision meeting (3 rounds)
+    REVIEW = "review"  # Review meeting (3 rounds)
+    RETROSPECTIVE = "retrospective"  # Retrospective meeting (3 rounds)
+    STANDUP = "standup"  # Standup (1 round)
+    DEBATE = "debate"  # Debate mode
+    LEAN_COFFEE = "lean_coffee"  # Lean Coffee
+    FREE = "free"  # Free discussion (default)
 
 
-class LoopPhase(str, enum.Enum):
+class LoopPhase(enum.StrEnum):
     """Company loop phase."""
 
     IDLE = "idle"
@@ -96,7 +96,7 @@ class LoopPhase(str, enum.Enum):
     PAUSED = "paused"
 
 
-class TaskPriority(str, enum.Enum):
+class TaskPriority(enum.StrEnum):
     """Task priority."""
 
     CRITICAL = "critical"
@@ -105,7 +105,7 @@ class TaskPriority(str, enum.Enum):
     LOW = "low"
 
 
-class TaskHorizon(str, enum.Enum):
+class TaskHorizon(enum.StrEnum):
     """Task time horizon."""
 
     SHORT = "short"
@@ -113,7 +113,7 @@ class TaskHorizon(str, enum.Enum):
     LONG = "long"
 
 
-class MemoryScope(str, enum.Enum):
+class MemoryScope(enum.StrEnum):
     """Memory scope."""
 
     GLOBAL = "global"
@@ -122,7 +122,7 @@ class MemoryScope(str, enum.Enum):
     USER = "user"
 
 
-class EventType(str, enum.Enum):
+class EventType(enum.StrEnum):
     """System event type."""
 
     # Team events
@@ -352,13 +352,13 @@ class AgentActivity(BaseModel):
     id: str = Field(default_factory=_new_id)
     agent_id: str
     session_id: str
-    tool_name: str          # Tool name (Bash, Edit, Read, Agent, etc.)
+    tool_name: str  # Tool name (Bash, Edit, Read, Agent, etc.)
     input_summary: str = ""  # Input summary (e.g. command, file path)
     output_summary: str = ""  # Output summary (truncated to 500 chars)
     timestamp: datetime = Field(default_factory=datetime.now)
     duration_ms: int | None = None  # Tool call duration (ms), populated by Pre->Post correlation
-    status: str = "completed"       # "running" | "completed" | "error"
-    error: str | None = None        # Error message
+    status: str = "completed"  # "running" | "completed" | "error"
+    error: str | None = None  # Error message
 
 
 # ============================================================

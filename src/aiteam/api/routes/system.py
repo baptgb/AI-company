@@ -376,9 +376,7 @@ async def list_system_rules() -> dict:
         "summary": {
             "automated_count": len(_AUTOMATED_RULES),
             "advisory_count": len(_ADVISORY_RULES),
-            "categories": sorted(
-                {r["category"] for r in _AUTOMATED_RULES + _ADVISORY_RULES}
-            ),
+            "categories": sorted({r["category"] for r in _AUTOMATED_RULES + _ADVISORY_RULES}),
         },
     }
 

@@ -80,7 +80,7 @@ def _resolve_cc_team_name(session_id: str, agent_name: str = "") -> str | None:
     if agent_name:
         for config_path in config_files:
             try:
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(config_path, encoding="utf-8") as f:
                     config = json.load(f)
                 for m in config.get("members", []):
                     if m.get("name", "") == agent_name:
@@ -92,7 +92,7 @@ def _resolve_cc_team_name(session_id: str, agent_name: str = "") -> str | None:
     if session_id:
         for config_path in config_files:
             try:
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(config_path, encoding="utf-8") as f:
                     config = json.load(f)
                 if config.get("leadSessionId") == session_id:
                     return config.get("name")
@@ -100,7 +100,6 @@ def _resolve_cc_team_name(session_id: str, agent_name: str = "") -> str | None:
                 continue
 
     return None
-
 
 
 def main() -> None:

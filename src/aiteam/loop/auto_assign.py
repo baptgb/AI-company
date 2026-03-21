@@ -1,4 +1,5 @@
 """Task-Agent intelligent matching engine."""
+
 from __future__ import annotations
 
 from aiteam.storage.repository import StorageRepository
@@ -11,7 +12,9 @@ class TaskMatcher:
     async def find_matches(self, team_id: str) -> list[dict]:
         """Find matching suggestions between pending unassigned tasks and idle agents."""
         agents = await self._repo.list_agents(team_id)
-        idle_agents = [a for a in agents if a.status in ("waiting", "offline") and a.role != "leader"]
+        idle_agents = [
+            a for a in agents if a.status in ("waiting", "offline") and a.role != "leader"
+        ]
 
         tasks = await self._repo.list_tasks(team_id)
         pending = [t for t in tasks if t.status in ("pending",) and not t.assigned_to]
@@ -29,11 +32,13 @@ class TaskMatcher:
                     best_score = score
                     best_agent = agent
             if best_agent:
-                matches.append({
-                    "task_id": task.id,
-                    "task_title": task.title,
-                    "agent_id": best_agent.id,
-                    "agent_name": best_agent.name,
-                    "match_score": best_score,
-                })
+                matches.append(
+                    {
+                        "task_id": task.id,
+                        "task_title": task.title,
+                        "agent_id": best_agent.id,
+                        "agent_name": best_agent.name,
+                        "match_score": best_score,
+                    }
+                )
         return matches

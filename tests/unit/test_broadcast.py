@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from langchain_core.messages import AIMessage
 
 from aiteam.orchestrator.graph_compiler import compile_graph
 from aiteam.orchestrator.graphs.broadcast import (
-    BroadcastState,
     _broadcast_node,
     build_broadcast_graph,
 )
 from aiteam.orchestrator.nodes.reducer_node import reducer_node
 from aiteam.types import Agent, OrchestrationMode, Team
-
 
 # ================================================================
 # Fixtures

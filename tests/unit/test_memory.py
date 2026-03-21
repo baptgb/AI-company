@@ -16,7 +16,6 @@ from aiteam.memory.store import MemoryStore
 from aiteam.storage.repository import StorageRepository
 from aiteam.types import Memory, MemoryScope
 
-
 # ================================================================
 # MemoryStore
 # ================================================================
@@ -147,6 +146,7 @@ async def test_archive(db_repository: StorageRepository, tmp_path: Path) -> None
     assert "t1" in str(file_path)
 
     import json
+
     data = json.loads(file_path.read_text(encoding="utf-8"))
     assert len(data) == 2
 

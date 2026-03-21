@@ -154,6 +154,7 @@ class TeamModel(Base):
     def to_pydantic(self) -> Team:
         """Convert to Pydantic model."""
         from aiteam.types import TeamStatus
+
         return Team(
             id=self.id,
             name=self.name,
@@ -339,9 +340,7 @@ class MemoryModel(Base):
     scope: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     scope_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata_json: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSON, default=dict
-    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     accessed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 

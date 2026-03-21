@@ -97,19 +97,19 @@ class ContextRecovery:
         checkpoints: list[dict] = []
         for file_path in agent_dir.glob("*.json"):
             data = json.loads(file_path.read_text(encoding="utf-8"))
-            checkpoints.append({
-                "checkpoint_id": data["checkpoint_id"],
-                "agent_id": data["agent_id"],
-                "timestamp": data["timestamp"],
-            })
+            checkpoints.append(
+                {
+                    "checkpoint_id": data["checkpoint_id"],
+                    "agent_id": data["agent_id"],
+                    "timestamp": data["timestamp"],
+                }
+            )
 
         # Sort ascending by time
         checkpoints.sort(key=lambda x: x["timestamp"])
         return checkpoints
 
-    async def cleanup_old_checkpoints(
-        self, agent_id: str, keep_latest: int = 5
-    ) -> int:
+    async def cleanup_old_checkpoints(self, agent_id: str, keep_latest: int = 5) -> int:
         """Keep only the latest N checkpoints and delete older ones.
 
         Args:

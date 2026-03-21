@@ -46,10 +46,7 @@ async def reducer_node(state: dict, config: RunnableConfig) -> dict:
         "直接Output合并后的最终结果，不要包含多余的说明。"
     )
 
-    user_content = (
-        f"## 原始任务\n{task}\n\n"
-        f"## 各Agent的并行Output\n{all_outputs}"
-    )
+    user_content = f"## 原始任务\n{task}\n\n## 各Agent的并行Output\n{all_outputs}"
 
     llm = ChatAnthropic(model=llm_model)
     messages = [

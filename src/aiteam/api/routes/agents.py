@@ -92,10 +92,7 @@ async def add_agent(
     team = await manager.get_team(team_id)
     all_agents = await repo.list_agents(team.id)
     all_tasks = await repo.list_tasks(team.id)
-    pending_tasks = [
-        t for t in all_tasks
-        if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
-    ]
+    pending_tasks = [t for t in all_tasks if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)]
 
     # Most recent meeting
     meetings = await repo.list_meetings(team.id)
@@ -164,6 +161,7 @@ async def remove_agent(
     agent = await repo.get_agent(agent_id)
     if agent is None:
         from aiteam.api.exceptions import NotFoundError
+
         msg = f"Agent '{agent_id}' 不存在"
         raise NotFoundError(msg)
     result = await repo.delete_agent(agent_id)

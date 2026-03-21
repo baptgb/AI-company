@@ -62,17 +62,13 @@ class FailureAlchemist:
             },
         )
 
-        logger.info(
-            "FailureAlchemist: 失败任务 '%s' 已提炼为学习产物", task.title
-        )
+        logger.info("FailureAlchemist: 失败任务 '%s' 已提炼为学习产物", task.title)
         return {"antibody": antibody, "vaccine": vaccine, "catalyst": catalyst}
 
     def _generate_antibody(self, task) -> str:
         """Extract defense rule suggestions from a failure."""
         result = task.result or ""
-        error_info = (
-            task.config.get("error", "") if isinstance(task.config, dict) else ""
-        )
+        error_info = task.config.get("error", "") if isinstance(task.config, dict) else ""
         failure_context = result or error_info or "未记录失败原因"
 
         return (

@@ -95,7 +95,8 @@ async def get_project_task_wall(
 
     # Completed tasks sorted by completion time descending
     completed_tasks.sort(
-        key=lambda x: x.get("completed_at") or "", reverse=True,
+        key=lambda x: x.get("completed_at") or "",
+        reverse=True,
     )
 
     stats = {

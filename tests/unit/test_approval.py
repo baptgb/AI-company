@@ -9,8 +9,7 @@ from langgraph.types import Command
 
 from aiteam.orchestrator.graphs.coordinate import build_coordinate_graph
 from aiteam.orchestrator.nodes.approval_node import approval_node
-from aiteam.types import Agent, OrchestrationMode, Team
-
+from aiteam.types import Agent
 
 # ================================================================
 # Fixtures

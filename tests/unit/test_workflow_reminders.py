@@ -17,8 +17,8 @@ _hooks_dir = str(Path(__file__).resolve().parents[2] / "plugin" / "hooks")
 if _hooks_dir not in sys.path:
     sys.path.insert(0, _hooks_dir)
 
-import workflow_reminder
-from workflow_reminder import _check_workflow_reminders
+import workflow_reminder  # noqa: E402
+from workflow_reminder import _check_workflow_reminders  # noqa: E402
 
 
 def _use_temp_state(tmp_path: str):

@@ -98,9 +98,7 @@ async def leader_synthesize_node(state: dict, config: RunnableConfig) -> dict:
     )
 
     user_content = (
-        f"## 原始任务\n{task}\n\n"
-        f"## 执行计划\n{leader_plan}\n\n"
-        f"## 各成员Output\n{all_outputs}"
+        f"## 原始任务\n{task}\n\n## 执行计划\n{leader_plan}\n\n## 各成员Output\n{all_outputs}"
     )
 
     llm = ChatAnthropic(model=llm_model)

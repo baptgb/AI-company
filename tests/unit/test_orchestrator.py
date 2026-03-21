@@ -11,10 +11,8 @@ from aiteam.storage.repository import StorageRepository
 from aiteam.types import (
     Agent,
     OrchestrationMode,
-    TaskStatus,
     Team,
 )
-
 
 # ================================================================
 # Fixtures

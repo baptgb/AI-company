@@ -39,7 +39,9 @@ router_teams_memory = APIRouter(prefix="/api/teams", tags=["memory"])
 @router_teams_memory.get("/{team_id}/knowledge", response_model=APIListResponse[Memory])
 async def get_team_knowledge(
     team_id: str,
-    type: str = Query("", description="Type filter: failure_alchemy / lesson_learned / loop_review"),
+    type: str = Query(
+        "", description="Type filter: failure_alchemy / lesson_learned / loop_review"
+    ),
     limit: int = Query(50, ge=1, le=200, description="Return count limit"),
     repo: StorageRepository = Depends(get_repository),
 ) -> APIListResponse[Memory]:

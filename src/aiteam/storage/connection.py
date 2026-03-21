@@ -39,6 +39,7 @@ def _migrate_old_db_if_needed(new_db_path: Path) -> None:
         for old_path in old_candidates:
             if old_path.exists() and old_path.stat().st_size > 10000:
                 import shutil
+
                 shutil.copy2(str(old_path), str(new_db_path))
                 old_path.rename(old_path.with_suffix(".db.migrated"))
                 break

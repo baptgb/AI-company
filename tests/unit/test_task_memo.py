@@ -59,10 +59,13 @@ def _create_team_and_task(client: TestClient) -> tuple[str, str]:
     team_resp = client.post("/api/teams", json={"name": "memo-test-team"})
     team_id = team_resp.json()["data"]["id"]
 
-    task_resp = client.post(f"/api/teams/{team_id}/tasks/run", json={
-        "title": "测试任务",
-        "description": "用于memo测试",
-    })
+    task_resp = client.post(
+        f"/api/teams/{team_id}/tasks/run",
+        json={
+            "title": "测试任务",
+            "description": "用于memo测试",
+        },
+    )
     task_id = task_resp.json()["data"]["id"]
     return team_id, task_id
 
@@ -80,11 +83,14 @@ def test_empty_memo(app_client: TestClient):
 def test_add_memo(app_client: TestClient):
     """POST追加memo."""
     _, task_id = _create_team_and_task(app_client)
-    resp = app_client.post(f"/api/tasks/{task_id}/memo", json={
-        "content": "开始实施任务",
-        "type": "progress",
-        "author": "engineer-1",
-    })
+    resp = app_client.post(
+        f"/api/tasks/{task_id}/memo",
+        json={
+            "content": "开始实施任务",
+            "type": "progress",
+            "author": "engineer-1",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["success"] is True
@@ -99,12 +105,18 @@ def test_read_memo(app_client: TestClient):
     _, task_id = _create_team_and_task(app_client)
 
     # 追加两条
-    app_client.post(f"/api/tasks/{task_id}/memo", json={
-        "content": "第一条",
-    })
-    app_client.post(f"/api/tasks/{task_id}/memo", json={
-        "content": "第二条",
-    })
+    app_client.post(
+        f"/api/tasks/{task_id}/memo",
+        json={
+            "content": "第一条",
+        },
+    )
+    app_client.post(
+        f"/api/tasks/{task_id}/memo",
+        json={
+            "content": "第二条",
+        },
+    )
 
     resp = app_client.get(f"/api/tasks/{task_id}/memo")
     assert resp.status_code == 200
@@ -119,10 +131,13 @@ def test_memo_types(app_client: TestClient):
     _, task_id = _create_team_and_task(app_client)
 
     for memo_type in ("progress", "decision", "issue", "summary"):
-        app_client.post(f"/api/tasks/{task_id}/memo", json={
-            "content": f"类型={memo_type}",
-            "type": memo_type,
-        })
+        app_client.post(
+            f"/api/tasks/{task_id}/memo",
+            json={
+                "content": f"类型={memo_type}",
+                "type": memo_type,
+            },
+        )
 
     resp = app_client.get(f"/api/tasks/{task_id}/memo")
     memos = resp.json()["data"]
@@ -136,7 +151,10 @@ def test_memo_not_found(app_client: TestClient):
     resp = app_client.get("/api/tasks/nonexistent-id/memo")
     assert resp.status_code == 404
 
-    resp = app_client.post("/api/tasks/nonexistent-id/memo", json={
-        "content": "test",
-    })
+    resp = app_client.post(
+        "/api/tasks/nonexistent-id/memo",
+        json={
+            "content": "test",
+        },
+    )
     assert resp.status_code == 404

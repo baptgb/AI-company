@@ -64,7 +64,10 @@ class TeamManager:
                 logger.warning("事件发射失败: %s", event_type)
 
     async def _set_agents_status(
-        self, agents: list[Agent], status: AgentStatus, team_id: str,
+        self,
+        agents: list[Agent],
+        status: AgentStatus,
+        team_id: str,
     ) -> None:
         """Batch set Agent status and emit events."""
         for agent in agents:
@@ -470,12 +473,9 @@ class TeamManager:
         agents = await self._repo.list_agents(team.id)
         all_tasks = await self._repo.list_tasks(team.id)
         active_tasks = [
-            t for t in all_tasks
-            if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
+            t for t in all_tasks if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
         ]
-        completed_count = sum(
-            1 for t in all_tasks if t.status == TaskStatus.COMPLETED
-        )
+        completed_count = sum(1 for t in all_tasks if t.status == TaskStatus.COMPLETED)
 
         return TeamStatusSummary(
             team=team,

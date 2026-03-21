@@ -103,7 +103,9 @@ async def delete_project(
 
 
 @router.post(
-    "/{project_id}/phases", response_model=APIResponse[Phase], status_code=201,
+    "/{project_id}/phases",
+    response_model=APIResponse[Phase],
+    status_code=201,
 )
 async def create_phase(
     project_id: str,
@@ -163,7 +165,8 @@ async def update_phase_status(
     except ValueError:
         valid = [s.value for s in PhaseStatus]
         raise HTTPException(
-            status_code=400, detail=f"无效状态 '{body.status}'，可选: {valid}",
+            status_code=400,
+            detail=f"无效状态 '{body.status}'，可选: {valid}",
         )
 
     # Get current phase
@@ -174,7 +177,8 @@ async def update_phase_status(
     # Verify phase belongs to this project
     if phase.project_id != project_id:
         raise HTTPException(
-            status_code=400, detail=f"阶段 {phase_id} 不属于项目 {project_id}",
+            status_code=400,
+            detail=f"阶段 {phase_id} 不属于项目 {project_id}",
         )
 
     # Check status transition validity

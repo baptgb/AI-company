@@ -7,7 +7,6 @@ import pytest
 from aiteam.storage.repository import StorageRepository
 from aiteam.types import TaskStatus
 
-
 # ================================================================
 # Teams
 # ================================================================
@@ -177,15 +176,9 @@ async def test_list_tasks_filter_status(db_repository: StorageRepository) -> Non
 
 async def test_create_and_list_events(db_repository: StorageRepository) -> None:
     """创建事件并按条件列出."""
-    e1 = await db_repository.create_event(
-        "team.created", "system", {"team": "alpha"}
-    )
-    e2 = await db_repository.create_event(
-        "agent.created", "system", {"agent": "dev-1"}
-    )
-    e3 = await db_repository.create_event(
-        "team.created", "cli", {"team": "beta"}
-    )
+    await db_repository.create_event("team.created", "system", {"team": "alpha"})
+    await db_repository.create_event("agent.created", "system", {"agent": "dev-1"})
+    await db_repository.create_event("team.created", "cli", {"team": "beta"})
 
     # 全部列出
     all_events = await db_repository.list_events()
@@ -201,9 +194,7 @@ async def test_create_and_list_events(db_repository: StorageRepository) -> None:
     assert cli_events[0].data["team"] == "beta"
 
     # 同时按类型和来源过滤
-    filtered = await db_repository.list_events(
-        event_type="team.created", source="system"
-    )
+    filtered = await db_repository.list_events(event_type="team.created", source="system")
     assert len(filtered) == 1
 
     # 限制数量
@@ -223,12 +214,10 @@ async def test_create_and_search_memories(db_repository: StorageRepository) -> N
     m1 = await db_repository.create_memory(
         "team", team.id, "项目使用Python和FastAPI开发", {"tag": "tech"}
     )
-    m2 = await db_repository.create_memory(
+    await db_repository.create_memory(
         "team", team.id, "团队成员包括3名后端和2名前端", {"tag": "org"}
     )
-    m3 = await db_repository.create_memory(
-        "agent", "agent-001", "该Agent擅长数据分析"
-    )
+    await db_repository.create_memory("agent", "agent-001", "该Agent擅长数据分析")
 
     # 获取单条记忆
     fetched = await db_repository.get_memory(m1.id)

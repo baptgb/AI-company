@@ -121,19 +121,34 @@ def team_create(
         "permanent_members": {
             "hint": "以下角色为团队常驻成员，创建团队时必须包含，团队存续期间不Kill：",
             "roles": [
-                {"name": "qa-observer", "role": "常驻QA观察员", "description": "持续监控系统行为、检查前端显示、发现bug并上报"},
-                {"name": "bug-fixer", "role": "常驻Bug工程师", "description": "接收QA报告，定位并修复bug，验证修复效果"},
+                {
+                    "name": "qa-observer",
+                    "role": "常驻QA观察员",
+                    "description": "持续监控系统行为、检查前端显示、发现bug并上报",
+                },
+                {
+                    "name": "bug-fixer",
+                    "role": "常驻Bug工程师",
+                    "description": "接收QA报告，定位并修复bug，验证修复效果",
+                },
             ],
         },
         "temporary_members": {
             "hint": "以下角色按需创建，任务完成后Kill释放资源：",
             "roles": [
                 {"name": "developer", "count": "1-3", "description": "开发工程师，负责具体实现"},
-                {"name": "researcher", "count": "1-3", "description": "研究员，负责技术调研和方案设计"},
+                {
+                    "name": "researcher",
+                    "count": "1-3",
+                    "description": "研究员，负责技术调研和方案设计",
+                },
                 {"name": "tech-lead", "count": 1, "description": "技术负责人，负责架构决策"},
             ],
         },
-        "lifecycle_rule": "团队不关闭——只Kill临时成员。QA和Bug-fixer保持团队活跃。需要开发/研究时往团队加人，完成后Kill。",
+        "lifecycle_rule": (
+            "团队不关闭——只Kill临时成员。QA和Bug-fixer保持团队活跃。"
+            "需要开发/研究时往团队加人，完成后Kill。"
+        ),
     }
     return result
 
@@ -180,8 +195,12 @@ def _load_agent_prompt_template() -> str:
     """Load the standardized Agent prompt template."""
     # server.py is at src/aiteam/mcp/server.py, need to go up 4 levels to project root
     template_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
-        "plugin", "config", "agent-prompt-template.md",
+        os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        ),
+        "plugin",
+        "config",
+        "agent-prompt-template.md",
     )
     try:
         with open(template_path, encoding="utf-8") as f:
@@ -231,12 +250,16 @@ def agent_register(
         # hook_translator's auto-register path can obtain the accurate project_path
         effective_prompt = _render_agent_prompt(role)
 
-    return _api_call("POST", f"/api/teams/{team_id}/agents", {
-        "name": name,
-        "role": role,
-        "model": model,
-        "system_prompt": effective_prompt,
-    })
+    return _api_call(
+        "POST",
+        f"/api/teams/{team_id}/agents",
+        {
+            "name": name,
+            "role": role,
+            "model": model,
+            "system_prompt": effective_prompt,
+        },
+    )
 
 
 # ============================================================
@@ -391,10 +414,14 @@ def meeting_create(
     resolved = _resolve_team_id(team_id)
     if not resolved:
         return {"success": False, "error": "未找到活跃团队，请提供 team_id 或先创建团队"}
-    result = _api_call("POST", f"/api/teams/{resolved}/meetings", {
-        "topic": topic,
-        "participants": participants or [],
-    })
+    result = _api_call(
+        "POST",
+        f"/api/teams/{resolved}/meetings",
+        {
+            "topic": topic,
+            "participants": participants or [],
+        },
+    )
     if template and template != "free" and template in TEMPLATE_ROUNDS:
         result["_template"] = {
             "name": template,
@@ -440,12 +467,16 @@ def meeting_send_message(
     Returns:
         Successfully sent message info
     """
-    return _api_call("POST", f"/api/meetings/{meeting_id}/messages", {
-        "agent_id": agent_id,
-        "agent_name": agent_name,
-        "content": content,
-        "round_number": round_number,
-    })
+    return _api_call(
+        "POST",
+        f"/api/meetings/{meeting_id}/messages",
+        {
+            "agent_id": agent_id,
+            "agent_name": agent_name,
+            "content": content,
+            "round_number": round_number,
+        },
+    )
 
 
 # ============================================================
@@ -484,8 +515,7 @@ def meeting_conclude(meeting_id: str) -> dict[str, Any]:
     """
     result = _api_call("PUT", f"/api/meetings/{meeting_id}/conclude")
     result["_hint"] = (
-        "会议结论已自动保存到团队记忆。"
-        "可通过 memory_search 或 team_briefing 检索历史决策。"
+        "会议结论已自动保存到团队记忆。可通过 memory_search 或 team_briefing 检索历史决策。"
     )
     return result
 
@@ -697,7 +727,9 @@ def memory_search(
     Returns:
         List of matching memories
     """
-    params = urllib.parse.urlencode({"scope": scope, "scope_id": scope_id, "query": query, "limit": limit})
+    params = urllib.parse.urlencode(
+        {"scope": scope, "scope_id": scope_id, "query": query, "limit": limit}
+    )
     return _api_call("GET", f"/api/memory?{params}")
 
 
@@ -827,11 +859,15 @@ def project_create(
     Returns:
         Created project info including project_id
     """
-    return _api_call("POST", "/api/projects", {
-        "name": name,
-        "description": description,
-        "root_path": root_path,
-    })
+    return _api_call(
+        "POST",
+        "/api/projects",
+        {
+            "name": name,
+            "description": description,
+            "root_path": root_path,
+        },
+    )
 
 
 # ============================================================
@@ -857,11 +893,15 @@ def phase_create(
     Returns:
         Created phase info including phase_id
     """
-    return _api_call("POST", f"/api/projects/{project_id}/phases", {
-        "name": name,
-        "description": description,
-        "order": order,
-    })
+    return _api_call(
+        "POST",
+        f"/api/projects/{project_id}/phases",
+        {
+            "name": name,
+            "description": description,
+            "order": order,
+        },
+    )
 
 
 # ============================================================
@@ -890,49 +930,139 @@ _PROJECT_TYPE_ROLES: dict[str, dict[str, Any]] = {
     "web-app": {
         "description": "全栈Web应用项目",
         "roles": [
-            {"name": "tech-lead", "count": 1, "description": "架构设计、技术决策、代码审查", "template": "tech-lead"},
-            {"name": "backend-engineer", "count": "1-2", "description": "API开发、数据库设计、业务逻辑", "template": "team-member"},
-            {"name": "frontend-engineer", "count": "1-2", "description": "UI组件、页面交互、响应式布局", "template": "team-member"},
-            {"name": "qa-engineer", "count": 1, "description": "端到端测试、跨浏览器兼容性", "template": "team-member"},
+            {
+                "name": "tech-lead",
+                "count": 1,
+                "description": "架构设计、技术决策、代码审查",
+                "template": "tech-lead",
+            },
+            {
+                "name": "backend-engineer",
+                "count": "1-2",
+                "description": "API开发、数据库设计、业务逻辑",
+                "template": "team-member",
+            },
+            {
+                "name": "frontend-engineer",
+                "count": "1-2",
+                "description": "UI组件、页面交互、响应式布局",
+                "template": "team-member",
+            },
+            {
+                "name": "qa-engineer",
+                "count": 1,
+                "description": "端到端测试、跨浏览器兼容性",
+                "template": "team-member",
+            },
         ],
     },
     "api-service": {
         "description": "后端API服务项目",
         "roles": [
-            {"name": "tech-lead", "count": 1, "description": "API架构、接口规范、性能优化", "template": "tech-lead"},
-            {"name": "backend-engineer", "count": "2-3", "description": "端点开发、中间件、数据持久化", "template": "team-member"},
-            {"name": "qa-engineer", "count": 1, "description": "API测试、负载测试、契约测试", "template": "team-member"},
+            {
+                "name": "tech-lead",
+                "count": 1,
+                "description": "API架构、接口规范、性能优化",
+                "template": "tech-lead",
+            },
+            {
+                "name": "backend-engineer",
+                "count": "2-3",
+                "description": "端点开发、中间件、数据持久化",
+                "template": "team-member",
+            },
+            {
+                "name": "qa-engineer",
+                "count": 1,
+                "description": "API测试、负载测试、契约测试",
+                "template": "team-member",
+            },
         ],
     },
     "data-pipeline": {
         "description": "数据处理管道项目",
         "roles": [
-            {"name": "tech-lead", "count": 1, "description": "管道架构、数据流设计", "template": "tech-lead"},
-            {"name": "data-engineer", "count": "2-3", "description": "ETL开发、数据清洗、调度配置", "template": "team-member"},
-            {"name": "qa-engineer", "count": 1, "description": "数据质量验证、回归测试", "template": "team-member"},
+            {
+                "name": "tech-lead",
+                "count": 1,
+                "description": "管道架构、数据流设计",
+                "template": "tech-lead",
+            },
+            {
+                "name": "data-engineer",
+                "count": "2-3",
+                "description": "ETL开发、数据清洗、调度配置",
+                "template": "team-member",
+            },
+            {
+                "name": "qa-engineer",
+                "count": 1,
+                "description": "数据质量验证、回归测试",
+                "template": "team-member",
+            },
         ],
     },
     "library": {
         "description": "可复用库/SDK项目",
         "roles": [
-            {"name": "tech-lead", "count": 1, "description": "API设计、版本策略、兼容性", "template": "tech-lead"},
-            {"name": "developer", "count": "1-2", "description": "核心实现、文档编写", "template": "team-member"},
-            {"name": "qa-engineer", "count": 1, "description": "单元测试、集成测试、示例验证", "template": "team-member"},
+            {
+                "name": "tech-lead",
+                "count": 1,
+                "description": "API设计、版本策略、兼容性",
+                "template": "tech-lead",
+            },
+            {
+                "name": "developer",
+                "count": "1-2",
+                "description": "核心实现、文档编写",
+                "template": "team-member",
+            },
+            {
+                "name": "qa-engineer",
+                "count": 1,
+                "description": "单元测试、集成测试、示例验证",
+                "template": "team-member",
+            },
         ],
     },
     "refactor": {
         "description": "代码重构项目",
         "roles": [
-            {"name": "tech-lead", "count": 1, "description": "重构策略、影响分析、渐进式迁移", "template": "tech-lead"},
-            {"name": "developer", "count": "1-2", "description": "代码迁移、依赖更新", "template": "team-member"},
-            {"name": "qa-engineer", "count": 1, "description": "回归测试、行为一致性验证", "template": "team-member"},
+            {
+                "name": "tech-lead",
+                "count": 1,
+                "description": "重构策略、影响分析、渐进式迁移",
+                "template": "tech-lead",
+            },
+            {
+                "name": "developer",
+                "count": "1-2",
+                "description": "代码迁移、依赖更新",
+                "template": "team-member",
+            },
+            {
+                "name": "qa-engineer",
+                "count": 1,
+                "description": "回归测试、行为一致性验证",
+                "template": "team-member",
+            },
         ],
     },
     "bugfix": {
         "description": "Bug修复项目",
         "roles": [
-            {"name": "developer", "count": "1-2", "description": "问题定位、修复实现", "template": "team-member"},
-            {"name": "qa-engineer", "count": 1, "description": "复现验证、回归测试", "template": "team-member"},
+            {
+                "name": "developer",
+                "count": "1-2",
+                "description": "问题定位、修复实现",
+                "template": "team-member",
+            },
+            {
+                "name": "qa-engineer",
+                "count": 1,
+                "description": "复现验证、回归测试",
+                "template": "team-member",
+            },
         ],
     },
 }
@@ -1138,7 +1268,8 @@ def taskwall_view(
     Args:
         team_id: Team ID or name
         horizon: Filter by time horizon, one of "short" / "mid" / "long" (empty = all)
-        priority: Filter by priority, one of "critical" / "high" / "medium" / "low", comma-separated for multiple (empty = all)
+        priority: Filter by priority, one of "critical" / "high" / "medium" / "low",
+            comma-separated for multiple (empty = all)
 
     Returns:
         Task wall data grouped by short/mid/long, each group sorted by score descending
@@ -1179,12 +1310,16 @@ def os_report_issue(
     Returns:
         Created Issue task info
     """
-    return _api_call("POST", f"/api/teams/{team_id}/issues", {
-        "title": title,
-        "description": description,
-        "severity": severity,
-        "category": category,
-    })
+    return _api_call(
+        "POST",
+        f"/api/teams/{team_id}/issues",
+        {
+            "title": title,
+            "description": description,
+            "severity": severity,
+            "category": category,
+        },
+    )
 
 
 # ============================================================
@@ -1206,10 +1341,14 @@ def os_resolve_issue(issue_id: str, resolution: str) -> dict[str, Any]:
     Returns:
         Updated Issue info
     """
-    return _api_call("PUT", f"/api/issues/{issue_id}/status", {
-        "status": "resolved",
-        "resolution": resolution,
-    })
+    return _api_call(
+        "PUT",
+        f"/api/issues/{issue_id}/status",
+        {
+            "status": "resolved",
+            "resolution": resolution,
+        },
+    )
 
 
 # ============================================================
@@ -1253,11 +1392,15 @@ def task_memo_add(
     Returns:
         Added memo record
     """
-    return _api_call("POST", f"/api/tasks/{task_id}/memo", {
-        "content": content,
-        "type": memo_type,
-        "author": author,
-    })
+    return _api_call(
+        "POST",
+        f"/api/tasks/{task_id}/memo",
+        {
+            "content": content,
+            "type": memo_type,
+            "author": author,
+        },
+    )
 
 
 # ============================================================
@@ -1337,8 +1480,17 @@ def _ensure_api_running() -> None:
     logger.info("Starting FastAPI subprocess on port 8000...")
     try:
         _api_process = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "aiteam.api.app:create_app",
-             "--host", "127.0.0.1", "--port", "8000", "--factory"],
+            [
+                sys.executable,
+                "-m",
+                "uvicorn",
+                "aiteam.api.app:create_app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8000",
+                "--factory",
+            ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
         )
@@ -1352,7 +1504,9 @@ def _ensure_api_running() -> None:
             logger.info("FastAPI subprocess is ready")
             return
         if _api_process.poll() is not None:
-            logger.warning("FastAPI subprocess exited prematurely (code=%s)", _api_process.returncode)
+            logger.warning(
+                "FastAPI subprocess exited prematurely (code=%s)", _api_process.returncode
+            )
             _api_process = None
             return
     logger.warning("FastAPI subprocess did not become ready within 10s")

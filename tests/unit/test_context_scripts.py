@@ -8,10 +8,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
-
-import pytest
 
 HOOKS_DIR = Path(__file__).parent.parent.parent / "plugin" / "hooks"
 CONFIG_DIR = Path(__file__).parent.parent.parent / "plugin" / "config"
@@ -41,17 +38,19 @@ class TestStatusline:
 
     def test_basic_context_output(self):
         """正常输入时输出状态行."""
-        input_data = json.dumps({
-            "context_window": {
-                "used_percentage": 45.2,
-                "context_window_size": 200000,
-            },
-            "model": {
-                "id": "claude-opus-4-6",
-                "display_name": "Opus 4.6",
-            },
-            "cwd": "/home/user/project",
-        })
+        input_data = json.dumps(
+            {
+                "context_window": {
+                    "used_percentage": 45.2,
+                    "context_window_size": 200000,
+                },
+                "model": {
+                    "id": "claude-opus-4-6",
+                    "display_name": "Opus 4.6",
+                },
+                "cwd": "/home/user/project",
+            }
+        )
         result = subprocess.run(
             [sys.executable, str(self.script)],
             input=input_data,
@@ -71,20 +70,26 @@ class TestStatusline:
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
 
-        input_data = json.dumps({
-            "context_window": {
-                "used_percentage": 82.5,
-                "context_window_size": 1000000,
-            },
-            "model": {"id": "claude-opus-4-6", "display_name": "Opus 4.6"},
-        })
+        input_data = json.dumps(
+            {
+                "context_window": {
+                    "used_percentage": 82.5,
+                    "context_window_size": 1000000,
+                },
+                "model": {"id": "claude-opus-4-6", "display_name": "Opus 4.6"},
+            }
+        )
         result = subprocess.run(
             [sys.executable, str(self.script)],
             input=input_data,
             capture_output=True,
             text=True,
             timeout=10,
-            env={**dict(__import__("os").environ), "HOME": str(tmp_path), "USERPROFILE": str(tmp_path)},
+            env={
+                **dict(__import__("os").environ),
+                "HOME": str(tmp_path),
+                "USERPROFILE": str(tmp_path),
+            },
         )
         assert result.returncode == 0
 
@@ -101,10 +106,12 @@ class TestStatusline:
             ("claude-haiku-4-5", "Haiku"),
             ("claude-sonnet-4-6", "Sonnet"),
         ]:
-            input_data = json.dumps({
-                "context_window": {"used_percentage": 10},
-                "model": {"id": model_id, "display_name": expected_text},
-            })
+            input_data = json.dumps(
+                {
+                    "context_window": {"used_percentage": 10},
+                    "model": {"id": model_id, "display_name": expected_text},
+                }
+            )
             result = subprocess.run(
                 [sys.executable, str(self.script)],
                 input=input_data,
@@ -131,13 +138,21 @@ class TestContextMonitor:
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir(exist_ok=True)
         monitor = claude_dir / "context-monitor.json"
-        monitor.write_text(json.dumps({
-            "used_percentage": pct,
-            "timestamp": "2026-03-14T00:00:00Z",
-            "context_window_size": 200000,
-        }))
+        monitor.write_text(
+            json.dumps(
+                {
+                    "used_percentage": pct,
+                    "timestamp": "2026-03-14T00:00:00Z",
+                    "context_window_size": 200000,
+                }
+            )
+        )
 
-        env = {**dict(__import__("os").environ), "HOME": str(tmp_path), "USERPROFILE": str(tmp_path)}
+        env = {
+            **dict(__import__("os").environ),
+            "HOME": str(tmp_path),
+            "USERPROFILE": str(tmp_path),
+        }
         result = subprocess.run(
             [sys.executable, str(self.script)],
             input="{}",
@@ -165,7 +180,11 @@ class TestContextMonitor:
 
     def test_no_monitor_file_silent(self, tmp_path):
         """无monitor文件时静默."""
-        env = {**dict(__import__("os").environ), "HOME": str(tmp_path), "USERPROFILE": str(tmp_path)}
+        env = {
+            **dict(__import__("os").environ),
+            "HOME": str(tmp_path),
+            "USERPROFILE": str(tmp_path),
+        }
         result = subprocess.run(
             [sys.executable, str(self.script)],
             input="{}",
@@ -192,13 +211,19 @@ class TestPreCompactSave:
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
 
-        input_data = json.dumps({
-            "trigger": "manual",
-            "session_id": "test-session",
-            "transcript_path": "/tmp/test.jsonl",
-        })
+        input_data = json.dumps(
+            {
+                "trigger": "manual",
+                "session_id": "test-session",
+                "transcript_path": "/tmp/test.jsonl",
+            }
+        )
 
-        env = {**dict(__import__("os").environ), "HOME": str(tmp_path), "USERPROFILE": str(tmp_path)}
+        env = {
+            **dict(__import__("os").environ),
+            "HOME": str(tmp_path),
+            "USERPROFILE": str(tmp_path),
+        }
         result = subprocess.run(
             [sys.executable, str(self.script)],
             input=input_data,
@@ -347,9 +372,7 @@ if cfg:
                 {"name": "qa-observer", "role": "QA", "enabled": True},
             ],
         }
-        (config_dir / "team-defaults.json").write_text(
-            json.dumps(config), encoding="utf-8"
-        )
+        (config_dir / "team-defaults.json").write_text(json.dumps(config), encoding="utf-8")
 
         script_content = f"""
 import json, sys

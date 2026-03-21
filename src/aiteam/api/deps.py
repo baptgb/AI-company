@@ -51,7 +51,7 @@ async def _run_migrations(db_url: str | None = None) -> None:
         ("tasks", "parent_id", "VARCHAR(36)"),
         ("tasks", "depends_on", "JSON DEFAULT '[]'"),
         ("tasks", "depth", "INTEGER DEFAULT 0"),
-        ("tasks", "order", 'INTEGER DEFAULT 0'),
+        ("tasks", "order", "INTEGER DEFAULT 0"),
         ("tasks", "template_id", "VARCHAR(50)"),
         ("meetings", "project_id", "VARCHAR(36)"),
         ("tasks", "config", "JSON DEFAULT '{}'"),
@@ -61,10 +61,11 @@ async def _run_migrations(db_url: str | None = None) -> None:
         for table_name, col_name, col_type in migrations:
             # Check if column already exists
             has_column = await conn.run_sync(
-                lambda sync_conn, t=table_name, c=col_name: c
-                in [col["name"] for col in inspect(sync_conn).get_columns(t)]
-                if inspect(sync_conn).has_table(t)
-                else False
+                lambda sync_conn, t=table_name, c=col_name: (
+                    c in [col["name"] for col in inspect(sync_conn).get_columns(t)]
+                    if inspect(sync_conn).has_table(t)
+                    else False
+                )
             )
             if not has_column:
                 # SAFETY: values are hardcoded constants, not user input
@@ -78,19 +79,27 @@ async def _run_migrations(db_url: str | None = None) -> None:
 
         # Migration: tasks.team_id from NOT NULL to nullable (support project-level tasks)
         team_id_nullable = await conn.run_sync(
-            lambda sync_conn: next(
-                (col["nullable"] for col in inspect(sync_conn).get_columns("tasks")
-                 if col["name"] == "team_id"),
-                True,  # If column not found, skip
-            ) if inspect(sync_conn).has_table("tasks") else True
+            lambda sync_conn: (
+                next(
+                    (
+                        col["nullable"]
+                        for col in inspect(sync_conn).get_columns("tasks")
+                        if col["name"] == "team_id"
+                    ),
+                    True,  # If column not found, skip
+                )
+                if inspect(sync_conn).has_table("tasks")
+                else True
+            )
         )
         if not team_id_nullable:
-            logger.info("Migration: rebuilding tasks table with nullable team_id (project-level tasks)")
-            await conn.execute(text(
-                "CREATE TABLE tasks_new AS SELECT * FROM tasks"
-            ))
+            logger.info(
+                "Migration: rebuilding tasks table with nullable team_id (project-level tasks)"
+            )
+            await conn.execute(text("CREATE TABLE tasks_new AS SELECT * FROM tasks"))
             await conn.execute(text("DROP TABLE tasks"))
-            await conn.execute(text("""
+            await conn.execute(
+                text("""
                 CREATE TABLE tasks (
                     id VARCHAR(36) PRIMARY KEY,
                     team_id VARCHAR(36),
@@ -113,10 +122,9 @@ async def _run_migrations(db_url: str | None = None) -> None:
                     started_at DATETIME,
                     completed_at DATETIME
                 )
-            """))
-            await conn.execute(text(
-                "INSERT INTO tasks SELECT * FROM tasks_new"
-            ))
+            """)
+            )
+            await conn.execute(text("INSERT INTO tasks SELECT * FROM tasks_new"))
             await conn.execute(text("DROP TABLE tasks_new"))
             await conn.execute(text("CREATE INDEX ix_tasks_team_id ON tasks (team_id)"))
             logger.info("Migration: tasks table rebuild complete")
@@ -137,7 +145,9 @@ async def _auto_create_projects(repo: StorageRepository) -> None:
         project = existing_projects[0]
         for team in orphan_teams:
             await repo.update_team(team.id, project_id=project.id)
-        logger.info("Linked %d orphan Teams to existing Project: %s", len(orphan_teams), project.name)
+        logger.info(
+            "Linked %d orphan Teams to existing Project: %s", len(orphan_teams), project.name
+        )
     else:
         # Create a unified Project, using team_id as unique root_path
         project = await repo.create_project(
@@ -190,7 +200,9 @@ async def _startup_reconciliation(repo: StorageRepository) -> None:
                 stale_count += 1
 
     if reconciled > 0:
-        logger.warning("Startup reconciliation: %d agents reset (status + session cleared)", reconciled)
+        logger.warning(
+            "Startup reconciliation: %d agents reset (status + session cleared)", reconciled
+        )
     else:
         logger.info("Startup reconciliation: no reset needed")
     if stale_count > 0:
@@ -210,7 +222,9 @@ async def init_dependencies() -> None:
     _memory_store = MemoryStore(repository=_repository)
     _event_bus = EventBus(repo=_repository)
     _manager = TeamManager(
-        repository=_repository, memory=_memory_store, event_bus=_event_bus,
+        repository=_repository,
+        memory=_memory_store,
+        event_bus=_event_bus,
     )
     _hook_translator = HookTranslator(repo=_repository, event_bus=_event_bus)
     _loop_engine = LoopEngine(repo=_repository)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """SubagentStart hook — inject OS environment context into sub-agents."""
+
 import json
 import os
 import sys
@@ -10,7 +11,7 @@ def main():
         raw = sys.stdin.buffer.read().decode("utf-8")
         if not raw.strip():
             return
-        payload = json.loads(raw)
+        json.loads(raw)
     except Exception:
         return
 
@@ -26,8 +27,12 @@ def main():
     lines.append("3. 完成时：task_memo_add(type=summary)写入最终总结")
     lines.append("4. 不直接修改不属于你任务范围的文件")
     lines.append("5. 遇到工具限制或阻塞：向Leader汇报，不要绕过")
-    lines.append("6. 2-Action规则：每执行2个实质性操作（编辑文件/运行命令/创建资源）后，用task_memo_add记录进展（防上下文压缩丢失）")
-    lines.append("7. 3次失败升级：同一任务用同一方法连续失败3次，必须改变方法或向Leader上报，不要继续重试")
+    lines.append(
+        "6. 2-Action规则：每执行2个实质性操作（编辑文件/运行命令/创建资源）后，用task_memo_add记录进展（防上下文压缩丢失）"
+    )
+    lines.append(
+        "7. 3次失败升级：同一任务用同一方法连续失败3次，必须改变方法或向Leader上报，不要继续重试"
+    )
     lines.append("")
     lines.append("## 汇报格式")
     lines.append("完成后使用以下格式向Leader汇报：")

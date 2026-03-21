@@ -29,17 +29,22 @@ async def approval_node(state: dict, config: RunnableConfig) -> dict | Command:
     plan = state.get("leader_plan", "")
 
     # Use LangGraph interrupt to pause and wait for external input
-    decision = interrupt({
-        "type": "approval_request",
-        "plan": plan,
-        "message": "请审批以下执行计划",
-    })
+    decision = interrupt(
+        {
+            "type": "approval_request",
+            "plan": plan,
+            "message": "请审批以下执行计划",
+        }
+    )
 
     # Decision passed in when externally resumed
     if decision.get("approved", False):
         return {"approval_status": "approved"}
     else:
-        return Command(goto="__end__", update={
-            "approval_status": "rejected",
-            "final_result": f"任务被人工拒绝: {decision.get('reason', '无原因')}",
-        })
+        return Command(
+            goto="__end__",
+            update={
+                "approval_status": "rejected",
+                "final_result": f"任务被人工拒绝: {decision.get('reason', '无原因')}",
+            },
+        )

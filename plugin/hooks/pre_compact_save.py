@@ -5,7 +5,7 @@ Fires when auto-compact or manual /compact triggers, records the event.
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -14,7 +14,7 @@ def main():
         input_data = sys.stdin.buffer.read().decode("utf-8")
         record = {
             "trigger": "unknown",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         if input_data and input_data.strip():

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from aiteam.storage.connection import get_engine, _engine
+from aiteam.storage.connection import get_engine
 
 
 @pytest.fixture(autouse=True)
@@ -78,6 +78,7 @@ class TestGetEnginePoolConfig:
 
         # 重置引擎缓存
         import aiteam.storage.connection as conn_mod
+
         conn_mod._engine = None
 
         # PostgreSQL

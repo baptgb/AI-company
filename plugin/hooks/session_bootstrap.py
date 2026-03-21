@@ -46,9 +46,7 @@ def _build_auto_team_instructions(config: dict) -> list[str]:
     if not config.get("auto_create_team"):
         return []
 
-    enabled_members = [
-        m for m in config.get("permanent_members", []) if m.get("enabled")
-    ]
+    enabled_members = [m for m in config.get("permanent_members", []) if m.get("enabled")]
     if not enabled_members:
         return []
 
@@ -107,9 +105,7 @@ def _build_briefing() -> str:
                         priority = t.get("priority", "medium")
                         horizon = t.get("horizon", "mid")
                         score = t.get("score", 0)
-                        lines.append(
-                            f"  [{priority}/{horizon}] {t['title']} (score:{score:.1f})"
-                        )
+                        lines.append(f"  [{priority}/{horizon}] {t['title']} (score:{score:.1f})")
                 else:
                     lines.append("任务墙: 无待办任务")
                 lines.append("")
@@ -117,9 +113,9 @@ def _build_briefing() -> str:
                 stats = wall_data.get("stats", {})
                 if stats:
                     lines.append(
-                        f"统计: 总{stats.get('total',0)}任务, "
-                        f"已完成{stats.get('completed_count',0)}, "
-                        f"待办{stats.get('by_status',{}).get('pending',0)}"
+                        f"统计: 总{stats.get('total', 0)}任务, "
+                        f"已完成{stats.get('completed_count', 0)}, "
+                        f"待办{stats.get('by_status', {}).get('pending', 0)}"
                     )
                     lines.append("")
 
@@ -142,12 +138,20 @@ def _build_briefing() -> str:
     lines.append("15. 上下文管理: [CONTEXT WARNING]时完成当前任务后保存；[CRITICAL]时立即停止")
     lines.append("16. 完整规则: GET /api/system/rules 查询全部规则")
     lines.append("17. 自主推进: 按任务墙优先级持续工作，不等待用户确认每一步")
-    lines.append("18. 决策分级: 战术决策自主做主（任务分配、实施方式）；战略决策请示用户（项目方向、重大架构变更）")
+    lines.append(
+        "18. 决策分级: 战术决策自主做主（任务分配、实施方式）；战略决策请示用户（项目方向、重大架构变更）"
+    )
     lines.append("19. 阻塞切换: 某任务需要用户批准时暂停该任务，切换到其他不需要批准的任务继续推进")
     lines.append("20. 统一汇报: 用户回来时先做阶段汇报，统一列出待决策事项，不逐步询问")
-    lines.append("21. 先研究再实施: 系统级新功能必须先多角度外部研究+竞品分析，召开会议讨论后再实施")
-    lines.append("22. 2-Action规则: 每执行2个实质性操作（编辑文件/运行命令/创建资源）后，用task_memo_add记录进展（防上下文压缩丢失）")
-    lines.append("23. 3次失败升级: 同一任务用同一方法连续失败3次，必须：1)改变方法 2)请求其他Agent协助 3)上报Leader")
+    lines.append(
+        "21. 先研究再实施: 系统级新功能必须先多角度外部研究+竞品分析，召开会议讨论后再实施"
+    )
+    lines.append(
+        "22. 2-Action规则: 每执行2个实质性操作（编辑文件/运行命令/创建资源）后，用task_memo_add记录进展（防上下文压缩丢失）"
+    )
+    lines.append(
+        "23. 3次失败升级: 同一任务用同一方法连续失败3次，必须：1)改变方法 2)请求其他Agent协助 3)上报Leader"
+    )
     lines.append("")
 
     # In-progress task reminders
@@ -179,6 +183,7 @@ def _build_briefing() -> str:
 
     # Available Agent template list
     import os
+
     agents_dir = os.path.join(os.path.expanduser("~"), ".claude", "agents")
     if os.path.isdir(agents_dir):
         templates = [f.replace(".md", "") for f in os.listdir(agents_dir) if f.endswith(".md")]
@@ -229,9 +234,7 @@ def main() -> None:
             "cd ai-team-os && python -m uvicorn aiteam.api.app:create_app "
             "--factory --host 0.0.0.0 --port 8000 --reload\n"
         )
-        sys.stderr.write(
-            f"[aiteam-bootstrap] AI Team OS API not reachable at {API_URL}\n"
-        )
+        sys.stderr.write(f"[aiteam-bootstrap] AI Team OS API not reachable at {API_URL}\n")
 
 
 if __name__ == "__main__":

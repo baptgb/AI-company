@@ -37,9 +37,7 @@ async def ws_events(websocket: WebSocket) -> None:
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                await websocket.send_text(
-                    WSError(message="无效的JSON格式").model_dump_json()
-                )
+                await websocket.send_text(WSError(message="无效的JSON格式").model_dump_json())
                 continue
 
             msg_type = msg.get("type", "")

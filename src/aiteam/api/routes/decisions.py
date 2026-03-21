@@ -42,7 +42,18 @@ async def list_decisions(
             type_prefix = type.rstrip("*")
         elif "." in type and not any(
             type == f"{ns}.{sub}"
-            for ns in ("decision", "knowledge", "intent", "agent", "task", "meeting", "cc", "file", "system", "memory")
+            for ns in (
+                "decision",
+                "knowledge",
+                "intent",
+                "agent",
+                "task",
+                "meeting",
+                "cc",
+                "file",
+                "system",
+                "memory",
+            )
             for sub in type.split(".", 1)[1:]
             if sub
         ):
@@ -75,10 +86,7 @@ async def list_decisions(
 
         # Filter by team_id (source format is "team:{team_id}"）
         if team_id:
-            events = [
-                e for e in events
-                if e.source == f"team:{team_id}" or team_id in e.source
-            ]
+            events = [e for e in events if e.source == f"team:{team_id}" or team_id in e.source]
     else:
         events = await repo.list_events(
             event_type=exact_type,
@@ -86,9 +94,6 @@ async def list_decisions(
             limit=limit,
         )
         if team_id:
-            events = [
-                e for e in events
-                if e.source == f"team:{team_id}" or team_id in e.source
-            ]
+            events = [e for e in events if e.source == f"team:{team_id}" or team_id in e.source]
 
     return APIListResponse(data=events, total=len(events))

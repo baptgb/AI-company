@@ -83,9 +83,7 @@ class ResilientMemoryBackend:
             self._record_failure()
             return await self._fallback.create(scope, scope_id, content, metadata)
 
-    async def search(
-        self, scope: str, scope_id: str, query: str, limit: int = 5
-    ) -> list[Memory]:
+    async def search(self, scope: str, scope_id: str, query: str, limit: int = 5) -> list[Memory]:
         """Search memories; falls back on primary failure."""
         if self._circuit_open and not self._should_probe_primary():
             return await self._fallback.search(scope, scope_id, query, limit)

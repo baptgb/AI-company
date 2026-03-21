@@ -10,7 +10,6 @@ from aiteam.memory.backends.sqlite_backend import SqliteMemoryBackend
 from aiteam.storage.repository import StorageRepository
 from aiteam.types import Memory, MemoryScope
 
-
 # ================================================================
 # SqliteMemoryBackend
 # ================================================================
@@ -125,9 +124,7 @@ class _FailingBackend:
     ) -> Memory:
         raise ConnectionError("primary 不可用")
 
-    async def search(
-        self, scope: str, scope_id: str, query: str, limit: int = 5
-    ) -> list[Memory]:
+    async def search(self, scope: str, scope_id: str, query: str, limit: int = 5) -> list[Memory]:
         raise ConnectionError("primary 不可用")
 
     async def list_all(self, scope: str, scope_id: str) -> list[Memory]:
@@ -157,9 +154,7 @@ class _CountingBackend:
             scope=MemoryScope(scope), scope_id=scope_id, content=content, metadata=metadata or {}
         )
 
-    async def search(
-        self, scope: str, scope_id: str, query: str, limit: int = 5
-    ) -> list[Memory]:
+    async def search(self, scope: str, scope_id: str, query: str, limit: int = 5) -> list[Memory]:
         self.call_count += 1
         if self.call_count <= self._fail_until:
             raise ConnectionError(f"失败 #{self.call_count}")
@@ -191,9 +186,7 @@ async def test_resilient_backend_fallback(
     failing_primary = _FailingBackend()
     fallback = SqliteMemoryBackend(db_repository)
 
-    resilient = ResilientMemoryBackend(
-        primary=failing_primary, fallback=fallback, threshold=1
-    )
+    resilient = ResilientMemoryBackend(primary=failing_primary, fallback=fallback, threshold=1)
 
     # primary 会失败，应该降级到 fallback（SQLite）
     memory = await resilient.create("agent", "a1", "降级测试")
@@ -211,9 +204,7 @@ async def test_resilient_backend_circuit_breaker(
     failing_primary = _FailingBackend()
     fallback = SqliteMemoryBackend(db_repository)
 
-    resilient = ResilientMemoryBackend(
-        primary=failing_primary, fallback=fallback, threshold=3
-    )
+    resilient = ResilientMemoryBackend(primary=failing_primary, fallback=fallback, threshold=3)
 
     # 前3次调用会尝试 primary（均失败），触发熔断
     for i in range(3):
@@ -233,9 +224,7 @@ async def test_resilient_backend_recovery() -> None:
     primary = _CountingBackend(fail_until=3)
     fallback = _CountingBackend()
 
-    resilient = ResilientMemoryBackend(
-        primary=primary, fallback=fallback, threshold=3
-    )
+    resilient = ResilientMemoryBackend(primary=primary, fallback=fallback, threshold=3)
     # 设置较小的 probe 间隔便于测试
     resilient._probe_interval = 2
 

@@ -5,10 +5,9 @@ Writes context monitor JSON for agent self-awareness.
 """
 
 import json
-import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -88,7 +87,7 @@ def main():
                     if jsonl_file.name.startswith("agent-"):
                         continue
                     try:
-                        with open(jsonl_file, "r", encoding="utf-8") as f:
+                        with open(jsonl_file, encoding="utf-8") as f:
                             for line in f:
                                 line = line.strip()
                                 if not line:
@@ -98,8 +97,12 @@ def main():
                                     u = (entry.get("message") or {}).get("usage")
                                     if u:
                                         total_project_input += int(u.get("input_tokens", 0))
-                                        total_project_input += int(u.get("cache_creation_input_tokens", 0))
-                                        total_project_input += int(u.get("cache_read_input_tokens", 0))
+                                        total_project_input += int(
+                                            u.get("cache_creation_input_tokens", 0)
+                                        )
+                                        total_project_input += int(
+                                            u.get("cache_read_input_tokens", 0)
+                                        )
                                         total_project_output += int(u.get("output_tokens", 0))
                                 except (json.JSONDecodeError, ValueError, TypeError):
                                     pass
@@ -137,7 +140,7 @@ def main():
             home_path = str(Path.home()).replace("\\", "/")
             cwd_norm = cwd_raw.replace("\\", "/")
             if cwd_norm.lower().startswith(home_path.lower()):
-                cwd_display = "~" + cwd_norm[len(home_path):]
+                cwd_display = "~" + cwd_norm[len(home_path) :]
             else:
                 cwd_display = cwd_norm
 
@@ -162,7 +165,7 @@ def main():
                 monitor_data = {
                     "used_percentage": used_pct,
                     "context_window_size": int(ctx.get("context_window_size", 200000)),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
                 monitor_path.write_text(
                     json.dumps(monitor_data, separators=(",", ":")),

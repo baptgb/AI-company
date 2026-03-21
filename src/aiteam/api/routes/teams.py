@@ -46,15 +46,14 @@ async def create_team(
         old_team = await repo.find_active_team_by_leader(body.leader_agent_id)
         if old_team:
             from datetime import datetime
+
             await repo.update_team(
                 old_team.id,
                 status="completed",
                 completed_at=datetime.now(),
             )
 
-    team = await manager.create_team(
-        name=body.name, mode=body.mode, config=body.config
-    )
+    team = await manager.create_team(name=body.name, mode=body.mode, config=body.config)
     # Set project_id and leader association
     updates: dict = {}
     if body.project_id:
@@ -94,15 +93,11 @@ async def update_team(
     if body.status == "completed":
         from datetime import datetime
 
-        team = await repo.update_team(
-            team.id, status="completed", completed_at=datetime.now()
-        )
+        team = await repo.update_team(team.id, status="completed", completed_at=datetime.now())
         agents = await repo.list_agents(team.id)
         for agent in agents:
             if agent.status == AgentStatus.BUSY:
-                await repo.update_agent(
-                    agent.id, status="offline", current_task=None
-                )
+                await repo.update_agent(agent.id, status="offline", current_task=None)
     elif body.status is not None:
         team = await repo.update_team(team.id, status=body.status)
 
@@ -156,7 +151,8 @@ async def team_briefing(
     # 5. Incomplete tasks (pending + running + blocked)
     all_tasks = await repo.list_tasks(team.id)
     pending_tasks = [
-        t for t in all_tasks
+        t
+        for t in all_tasks
         if t.status in (TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.BLOCKED)
     ]
     # Sort: ready tasks (pending/running) first, blocked last
@@ -172,9 +168,7 @@ async def team_briefing(
         names = ", ".join(a.name for a in idle_agents)
         hints.append(f"{len(idle_agents)}个agent空闲，可分配任务: {names}")
     if busy_agents:
-        descs = ", ".join(
-            f"{a.name}({a.current_task or '无描述'})" for a in busy_agents
-        )
+        descs = ", ".join(f"{a.name}({a.current_task or '无描述'})" for a in busy_agents)
         hints.append(f"{len(busy_agents)}个agent工作中: {descs}")
     if ready_tasks or blocked_tasks:
         hints.append(f"{len(ready_tasks)}个任务可执行，{len(blocked_tasks)}个被阻塞")
@@ -195,8 +189,7 @@ async def team_briefing(
     file_hotspots = hook_translator.get_file_hotspots(window_minutes=10)
     if file_hotspots:
         hotspot_desc = ", ".join(
-            f"{h['file_path']}({'+'.join(h['agents'])})"
-            for h in file_hotspots[:3]
+            f"{h['file_path']}({'+'.join(h['agents'])})" for h in file_hotspots[:3]
         )
         hints.append(f"文件编辑热点: {hotspot_desc}")
 
@@ -280,24 +273,28 @@ async def get_agent_intents(
         )
         if events:
             evt = events[0]
-            intents.append({
-                "agent_id": agent.id,
-                "agent_name": agent.name,
-                "tool_name": evt.data.get("tool_name", ""),
-                "intent_summary": evt.data.get("intent_summary", ""),
-                "input_preview": evt.data.get("input_preview", ""),
-                "timestamp": evt.timestamp.isoformat() if evt.timestamp else None,
-            })
+            intents.append(
+                {
+                    "agent_id": agent.id,
+                    "agent_name": agent.name,
+                    "tool_name": evt.data.get("tool_name", ""),
+                    "intent_summary": evt.data.get("intent_summary", ""),
+                    "input_preview": evt.data.get("input_preview", ""),
+                    "timestamp": evt.timestamp.isoformat() if evt.timestamp else None,
+                }
+            )
         else:
             # Busy but no intent record, return basic info only
-            intents.append({
-                "agent_id": agent.id,
-                "agent_name": agent.name,
-                "tool_name": "",
-                "intent_summary": "",
-                "input_preview": "",
-                "timestamp": None,
-            })
+            intents.append(
+                {
+                    "agent_id": agent.id,
+                    "agent_name": agent.name,
+                    "tool_name": "",
+                    "intent_summary": "",
+                    "input_preview": "",
+                    "timestamp": None,
+                }
+            )
 
     return {"success": True, "data": intents}
 
@@ -308,7 +305,10 @@ async def failure_analysis(
     body: dict[str, Any],
     repo: StorageRepository = Depends(get_repository),
 ) -> dict[str, Any]:
-    """Perform failure alchemy analysis on failed tasks, extracting defense rules + training cases + improvement proposals."""
+    """Perform failure alchemy analysis on failed tasks.
+
+    Extracts defense rules, training cases, and improvement proposals.
+    """
     task_id = body.get("task_id", "")
     if not task_id:
         return {"success": False, "error": "task_id is required"}

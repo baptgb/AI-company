@@ -41,13 +41,17 @@ def generate_hooks_config(api_url: str = "http://localhost:8000") -> dict:
         if event == "PreToolUse":
             matcher_config["matcher"] = "Agent|Bash|Edit|Write"
 
-        hooks[event] = [{
-            **matcher_config,
-            "hooks": [{
-                "type": "command",
-                "command": f"python .claude/hooks/send_event.py {event}",
-            }],
-        }]
+        hooks[event] = [
+            {
+                **matcher_config,
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": f"python .claude/hooks/send_event.py {event}",
+                    }
+                ],
+            }
+        ]
 
     return hooks
 

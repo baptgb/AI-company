@@ -59,9 +59,7 @@ async def get_efficiency_metrics(
     productivity = await repo.get_agent_productivity(team_id=team_id)
     total_activities = sum(p["activity_count"] for p in productivity)
     completed = task_stats["completed_tasks"]
-    avg_tools_per_task = (
-        round(total_activities / completed, 2) if completed > 0 else None
-    )
+    avg_tools_per_task = round(total_activities / completed, 2) if completed > 0 else None
 
     # 4. Top efficient agents (by activities_per_hour desc)
     top_agents = sorted(

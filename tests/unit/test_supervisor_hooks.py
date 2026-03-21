@@ -13,11 +13,11 @@ _hooks_dir = str(Path(__file__).resolve().parents[2] / "plugin" / "hooks")
 if _hooks_dir not in sys.path:
     sys.path.insert(0, _hooks_dir)
 
-from workflow_reminder import (
-    _check_leader_doing_too_much,
-    _check_team_has_permanent_members,
+from workflow_reminder import (  # noqa: E402
     _LEADER_CONSECUTIVE_THRESHOLD,
     _TEAM_WITHOUT_MEMBERS_THRESHOLD,
+    _check_leader_doing_too_much,
+    _check_team_has_permanent_members,
 )
 
 

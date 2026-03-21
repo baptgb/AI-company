@@ -59,9 +59,7 @@ class Mem0MemoryBackend:
         try:
             from mem0 import Memory as Mem0Memory
         except ImportError:
-            raise ImportError(
-                "使用 Mem0 后端需要安装 mem0ai 包: pip install mem0ai"
-            )
+            raise ImportError("使用 Mem0 后端需要安装 mem0ai 包: pip install mem0ai")
         self._mem0 = Mem0Memory.from_config(config or {})
 
     async def create(
@@ -90,9 +88,7 @@ class Mem0MemoryBackend:
             metadata=metadata or {},
         )
 
-    async def search(
-        self, scope: str, scope_id: str, query: str, limit: int = 5
-    ) -> list[Memory]:
+    async def search(self, scope: str, scope_id: str, query: str, limit: int = 5) -> list[Memory]:
         """Search memories via the Mem0 SDK."""
         params = _scope_to_mem0_params(scope, scope_id)
         results = self._mem0.search(query, **params, limit=limit)

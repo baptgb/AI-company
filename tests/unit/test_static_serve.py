@@ -46,7 +46,9 @@ def fake_dist(tmp_path):
 
 def test_root_serves_html(fake_dist):
     """dist存在时，/ 返回Dashboard HTML."""
-    with patch.object(Path, "resolve", lambda self: fake_dist / "src" / "aiteam" / "api" / "app.py"):
+    with patch.object(
+        Path, "resolve", lambda self: fake_dist / "src" / "aiteam" / "api" / "app.py"
+    ):
         app = create_app()
 
     client = _make_client(app)
@@ -58,7 +60,9 @@ def test_root_serves_html(fake_dist):
 
 def test_assets_served(fake_dist):
     """dist存在时，/assets/ 下的文件可访问."""
-    with patch.object(Path, "resolve", lambda self: fake_dist / "src" / "aiteam" / "api" / "app.py"):
+    with patch.object(
+        Path, "resolve", lambda self: fake_dist / "src" / "aiteam" / "api" / "app.py"
+    ):
         app = create_app()
 
     client = _make_client(app)
@@ -69,7 +73,9 @@ def test_assets_served(fake_dist):
 
 def test_api_routes_not_intercepted(fake_dist):
     """API路由不被静态文件拦截，/api/teams返回JSON."""
-    with patch.object(Path, "resolve", lambda self: fake_dist / "src" / "aiteam" / "api" / "app.py"):
+    with patch.object(
+        Path, "resolve", lambda self: fake_dist / "src" / "aiteam" / "api" / "app.py"
+    ):
         app = create_app()
 
     client = _make_client(app)
@@ -81,7 +87,8 @@ def test_api_routes_not_intercepted(fake_dist):
 def test_app_works_without_dist():
     """dist不存在时，应用正常启动，API正常工作."""
     with patch.object(
-        Path, "resolve",
+        Path,
+        "resolve",
         lambda self: Path(tempfile.mkdtemp()) / "src" / "aiteam" / "api" / "app.py",
     ):
         app = create_app()

@@ -1,4 +1,5 @@
 """Agent template index and recommendation routes."""
+
 from __future__ import annotations
 
 import re
@@ -6,8 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
-import json as _json
 
 router = APIRouter(tags=["agent-templates"])
 
@@ -25,6 +24,7 @@ def _parse_template(path: Path) -> dict[str, Any] | None:
             return None
         # Simple frontmatter parsing (no extra deps, pyyaml already in dependencies)
         import yaml  # noqa: PLC0415
+
         meta = yaml.safe_load(parts[1])
         if not isinstance(meta, dict):
             return None
@@ -78,7 +78,7 @@ async def recommend_template(task_type: str = "", keywords: str = "") -> dict[st
 async def get_template(name: str) -> dict[str, Any]:
     """Get full content of a single template."""
     # Prevent path traversal
-    if not re.match(r'^[\w\-]+$', name):
+    if not re.match(r"^[\w\-]+$", name):
         return {"error": "无效的模板名称"}
     path = AGENTS_DIR / f"{name}.md"
     if not path.exists():

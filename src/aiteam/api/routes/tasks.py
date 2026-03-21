@@ -11,7 +11,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from aiteam.api.deps import get_event_bus, get_manager, get_repository
 from aiteam.api.event_bus import EventBus
 from aiteam.api.exceptions import NotFoundError
-from aiteam.api.schemas import APIListResponse, APIResponse, IssueReport, TaskCreateBody, TaskDecompose, TaskRun
+from aiteam.api.schemas import (
+    APIListResponse,
+    APIResponse,
+    IssueReport,
+    TaskCreateBody,
+    TaskDecompose,
+    TaskRun,
+)
 from aiteam.loop.what_if import WhatIfAnalyzer
 from aiteam.orchestrator.team_manager import TeamManager
 from aiteam.storage.repository import StorageRepository
@@ -109,12 +116,14 @@ async def run_task(
     for t in running_tasks:
         overlap = _keyword_overlap(new_title, t.title)
         if overlap >= 2:
-            related_tasks.append({
-                "id": t.id,
-                "title": t.title,
-                "status": t.status.value if hasattr(t.status, "value") else str(t.status),
-                "overlap_words": overlap,
-            })
+            related_tasks.append(
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "status": t.status.value if hasattr(t.status, "value") else str(t.status),
+                    "overlap_words": overlap,
+                }
+            )
 
     # Sort by overlap count, return at most 5
     related_tasks.sort(key=lambda x: x["overlap_words"], reverse=True)
@@ -237,21 +246,27 @@ async def decompose_task(
     if body.subtasks:
         # User-defined custom subtasks
         for i, st in enumerate(body.subtasks):
-            subtask_specs.append({
-                "title": st.title,
-                "description": st.description,
-                "order": i,
-                "role_hint": "",
-            })
+            subtask_specs.append(
+                {
+                    "title": st.title,
+                    "description": st.description,
+                    "order": i,
+                    "role_hint": "",
+                }
+            )
     elif body.template and body.template in DECOMPOSE_TEMPLATES:
         # Use built-in template
         for tmpl in DECOMPOSE_TEMPLATES[body.template]:
-            subtask_specs.append({
-                "title": f"{body.title} — {tmpl['title_suffix']}",
-                "description": f"{body.description}\n\n子任务: {tmpl['title_suffix']}" if body.description else tmpl["title_suffix"],
-                "order": tmpl["order"],
-                "role_hint": tmpl["role_hint"],
-            })
+            subtask_specs.append(
+                {
+                    "title": f"{body.title} — {tmpl['title_suffix']}",
+                    "description": f"{body.description}\n\n子任务: {tmpl['title_suffix']}"
+                    if body.description
+                    else tmpl["title_suffix"],
+                    "order": tmpl["order"],
+                    "role_hint": tmpl["role_hint"],
+                }
+            )
 
     # Create subtasks (depth=1, parent_id=parent task ID)
     children: list[Task] = []
@@ -318,8 +333,7 @@ async def complete_task(
     # Cascade-unlock downstream tasks
     unblocked = await repo.resolve_task_dependencies(task_id)
     unblocked_info = [
-        {"id": t.id, "title": t.title, "new_status": t.status.value}
-        for t in unblocked
+        {"id": t.id, "title": t.title, "new_status": t.status.value} for t in unblocked
     ]
 
     if unblocked:
@@ -500,10 +514,7 @@ async def list_issues(
     """List all issues for a team (filtered by config.task_type=issue)."""
     team = await manager.get_team(team_id)
     all_tasks = await repo.list_tasks(team.id)
-    issues = [
-        t for t in all_tasks
-        if t.config.get("task_type") == "issue"
-    ]
+    issues = [t for t in all_tasks if t.config.get("task_type") == "issue"]
 
     return {
         "success": True,

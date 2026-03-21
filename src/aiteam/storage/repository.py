@@ -162,9 +162,7 @@ class StorageRepository:
     async def get_phase(self, phase_id: str) -> Phase | None:
         """Get a phase by ID."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(PhaseModel).where(PhaseModel.id == phase_id)
-            )
+            result = await session.execute(select(PhaseModel).where(PhaseModel.id == phase_id))
             row = result.scalar_one_or_none()
             return row.to_pydantic() if row else None
 
@@ -182,9 +180,7 @@ class StorageRepository:
     async def update_phase(self, phase_id: str, **kwargs: object) -> Phase | None:
         """Update phase information."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(PhaseModel).where(PhaseModel.id == phase_id)
-            )
+            result = await session.execute(select(PhaseModel).where(PhaseModel.id == phase_id))
             row = result.scalar_one_or_none()
             if row is None:
                 return None
@@ -208,9 +204,7 @@ class StorageRepository:
     async def delete_phase(self, phase_id: str) -> bool:
         """Delete a phase."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                delete(PhaseModel).where(PhaseModel.id == phase_id)
-            )
+            result = await session.execute(delete(PhaseModel).where(PhaseModel.id == phase_id))
             return result.rowcount > 0  # type: ignore[union-attr]
 
     async def get_active_phase(self, project_id: str) -> Phase | None:
@@ -245,7 +239,11 @@ class StorageRepository:
     # ================================================================
 
     async def create_team(
-        self, name: str, mode: str, config: dict | None = None, **kwargs: Any,
+        self,
+        name: str,
+        mode: str,
+        config: dict | None = None,
+        **kwargs: Any,
     ) -> Team:
         """Create a team."""
         team = Team(
@@ -263,27 +261,21 @@ class StorageRepository:
     async def get_team(self, team_id: str) -> Team | None:
         """Get a team by ID."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(TeamModel).where(TeamModel.id == team_id)
-            )
+            result = await session.execute(select(TeamModel).where(TeamModel.id == team_id))
             row = result.scalar_one_or_none()
             return row.to_pydantic() if row else None
 
     async def get_team_by_name(self, name: str) -> Team | None:
         """Get a team by name."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(TeamModel).where(TeamModel.name == name)
-            )
+            result = await session.execute(select(TeamModel).where(TeamModel.name == name))
             row = result.scalar_one_or_none()
             return row.to_pydantic() if row else None
 
     async def list_teams(self) -> list[Team]:
         """List all teams."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(TeamModel).order_by(TeamModel.created_at.desc())
-            )
+            result = await session.execute(select(TeamModel).order_by(TeamModel.created_at.desc()))
             rows = result.scalars().all()
             return [r.to_pydantic() for r in rows]
 
@@ -325,9 +317,7 @@ class StorageRepository:
     async def update_team(self, team_id: str, **kwargs: object) -> Team:
         """Update team information."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(TeamModel).where(TeamModel.id == team_id)
-            )
+            result = await session.execute(select(TeamModel).where(TeamModel.id == team_id))
             row = result.scalar_one_or_none()
             if row is None:
                 msg = f"团队 {team_id} 不存在"
@@ -353,18 +343,14 @@ class StorageRepository:
     async def delete_team(self, team_id: str) -> bool:
         """Delete a team."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                delete(TeamModel).where(TeamModel.id == team_id)
-            )
+            result = await session.execute(delete(TeamModel).where(TeamModel.id == team_id))
             return result.rowcount > 0  # type: ignore[union-attr]
 
     # ================================================================
     # Agents
     # ================================================================
 
-    async def create_agent(
-        self, team_id: str, name: str, role: str, **kwargs: object
-    ) -> Agent:
+    async def create_agent(self, team_id: str, name: str, role: str, **kwargs: object) -> Agent:
         """Create an Agent."""
         agent = Agent(
             team_id=team_id,
@@ -385,9 +371,7 @@ class StorageRepository:
     async def get_agent(self, agent_id: str) -> Agent | None:
         """Get an Agent by ID."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(AgentModel).where(AgentModel.id == agent_id)
-            )
+            result = await session.execute(select(AgentModel).where(AgentModel.id == agent_id))
             row = result.scalar_one_or_none()
             return row.to_pydantic() if row else None
 
@@ -405,9 +389,7 @@ class StorageRepository:
     async def update_agent(self, agent_id: str, **kwargs: object) -> Agent:
         """Update Agent information."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(AgentModel).where(AgentModel.id == agent_id)
-            )
+            result = await session.execute(select(AgentModel).where(AgentModel.id == agent_id))
             row = result.scalar_one_or_none()
             if row is None:
                 msg = f"Agent {agent_id} 不存在"
@@ -430,9 +412,7 @@ class StorageRepository:
     async def delete_agent(self, agent_id: str) -> bool:
         """Delete an Agent."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                delete(AgentModel).where(AgentModel.id == agent_id)
-            )
+            result = await session.execute(delete(AgentModel).where(AgentModel.id == agent_id))
             return result.rowcount > 0  # type: ignore[union-attr]
 
     # ================================================================
@@ -448,9 +428,19 @@ class StorageRepository:
         """
         # Build optional parameters
         optional: dict[str, object] = {}
-        for key in ("assigned_to", "parent_id", "project_id", "depends_on",
-                     "depth", "order", "template_id", "priority", "horizon",
-                     "tags", "config"):
+        for key in (
+            "assigned_to",
+            "parent_id",
+            "project_id",
+            "depends_on",
+            "depth",
+            "order",
+            "template_id",
+            "priority",
+            "horizon",
+            "tags",
+            "config",
+        ):
             if key in kwargs:
                 optional[key] = kwargs[key]
         # Set default values
@@ -484,15 +474,11 @@ class StorageRepository:
     async def get_task(self, task_id: str) -> Task | None:
         """Get a task by ID."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(TaskModel).where(TaskModel.id == task_id)
-            )
+            result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
             row = result.scalar_one_or_none()
             return row.to_pydantic() if row else None
 
-    async def list_tasks(
-        self, team_id: str, status: TaskStatus | None = None
-    ) -> list[Task]:
+    async def list_tasks(self, team_id: str, status: TaskStatus | None = None) -> list[Task]:
         """List team tasks, optionally filtered by status."""
         async with get_session(self._db_url) as session:
             stmt = select(TaskModel).where(TaskModel.team_id == team_id)
@@ -519,9 +505,7 @@ class StorageRepository:
     async def update_task(self, task_id: str, **kwargs: object) -> Task:
         """Update task information."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(TaskModel).where(TaskModel.id == task_id)
-            )
+            result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
             row = result.scalar_one_or_none()
             if row is None:
                 msg = f"任务 {task_id} 不存在"
@@ -625,9 +609,7 @@ class StorageRepository:
     # Events
     # ================================================================
 
-    async def create_event(
-        self, event_type: str, source: str, data: dict
-    ) -> Event:
+    async def create_event(self, event_type: str, source: str, data: dict) -> Event:
         """Create a system event."""
         event = Event(
             type=EventType(event_type),
@@ -693,9 +675,7 @@ class StorageRepository:
     async def get_memory(self, memory_id: str) -> Memory | None:
         """Get a memory by ID."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                select(MemoryModel).where(MemoryModel.id == memory_id)
-            )
+            result = await session.execute(select(MemoryModel).where(MemoryModel.id == memory_id))
             row = result.scalar_one_or_none()
             if row is not None:
                 # Update access time
@@ -741,9 +721,7 @@ class StorageRepository:
     async def delete_memory(self, memory_id: str) -> bool:
         """Delete a memory."""
         async with get_session(self._db_url) as session:
-            result = await session.execute(
-                delete(MemoryModel).where(MemoryModel.id == memory_id)
-            )
+            result = await session.execute(delete(MemoryModel).where(MemoryModel.id == memory_id))
             return result.rowcount > 0  # type: ignore[union-attr]
 
     async def list_team_knowledge(
@@ -775,10 +753,7 @@ class StorageRepository:
             memories = [r.to_pydantic() for r in rows]
 
         if memory_type:
-            memories = [
-                m for m in memories
-                if m.metadata.get("type") == memory_type
-            ]
+            memories = [m for m in memories if m.metadata.get("type") == memory_type]
         return memories
 
     async def list_agent_experience(
@@ -811,7 +786,10 @@ class StorageRepository:
     # ================================================================
 
     async def create_meeting(
-        self, team_id: str, topic: str, participants: list[str] | None = None,
+        self,
+        team_id: str,
+        topic: str,
+        participants: list[str] | None = None,
     ) -> Meeting:
         """Create a meeting."""
         meeting = Meeting(
@@ -834,7 +812,9 @@ class StorageRepository:
             return row.to_pydantic() if row else None
 
     async def list_meetings(
-        self, team_id: str, status: MeetingStatus | None = None,
+        self,
+        team_id: str,
+        status: MeetingStatus | None = None,
     ) -> list[Meeting]:
         """List team meetings, optionally filtered by status."""
         async with get_session(self._db_url) as session:
@@ -893,7 +873,9 @@ class StorageRepository:
         return message
 
     async def list_meeting_messages(
-        self, meeting_id: str, limit: int = 100,
+        self,
+        meeting_id: str,
+        limit: int = 100,
     ) -> list[MeetingMessage]:
         """List meeting messages."""
         async with get_session(self._db_url) as session:
@@ -939,7 +921,8 @@ class StorageRepository:
                     func.coalesce(
                         last_msg_subq.c.last_msg_time,
                         MeetingModel.created_at,
-                    ) < cutoff,
+                    )
+                    < cutoff,
                 )
             )
             result = await session.execute(stmt)
@@ -964,7 +947,9 @@ class StorageRepository:
     # ================================================================
 
     async def find_agent_by_session(
-        self, session_id: str, agent_name: str,
+        self,
+        session_id: str,
+        agent_name: str,
     ) -> Agent | None:
         """Find a registered Agent by CC session ID and Agent name."""
         async with get_session(self._db_url) as session:
@@ -995,11 +980,7 @@ class StorageRepository:
     async def find_agent_by_cc_id(self, cc_agent_id: str) -> Agent | None:
         """Find an Agent by CC internal agent_id."""
         async with get_session(self._db_url) as session:
-            stmt = (
-                select(AgentModel)
-                .where(AgentModel.cc_tool_use_id == cc_agent_id)
-                .limit(1)
-            )
+            stmt = select(AgentModel).where(AgentModel.cc_tool_use_id == cc_agent_id).limit(1)
             result = await session.execute(stmt)
             row = result.scalar_one_or_none()
             return row.to_pydantic() if row else None
@@ -1017,12 +998,18 @@ class StorageRepository:
             return [r.to_pydantic() for r in rows]
 
     async def count_agents_by_source(
-        self, source: str, session_id: str | None = None,
+        self,
+        source: str,
+        session_id: str | None = None,
     ) -> int:
         """Count Agents by source, optionally filtered by session."""
         async with get_session(self._db_url) as session:
-            stmt = select(func.count()).select_from(AgentModel).where(
-                AgentModel.source == source,
+            stmt = (
+                select(func.count())
+                .select_from(AgentModel)
+                .where(
+                    AgentModel.source == source,
+                )
             )
             if session_id is not None:
                 stmt = stmt.where(AgentModel.session_id == session_id)
@@ -1101,7 +1088,9 @@ class StorageRepository:
             session.add(row)
 
     async def list_activities(
-        self, agent_id: str, limit: int = 50,
+        self,
+        agent_id: str,
+        limit: int = 50,
     ) -> list[AgentActivity]:
         """Get an Agent's activity log."""
         async with get_session(self._db_url) as session:
@@ -1116,7 +1105,9 @@ class StorageRepository:
             return [r.to_pydantic() for r in rows]
 
     async def list_activities_by_session(
-        self, session_id: str, limit: int = 100,
+        self,
+        session_id: str,
+        limit: int = 100,
     ) -> list[AgentActivity]:
         """Get all activities under a session."""
         async with get_session(self._db_url) as session:
@@ -1180,10 +1171,7 @@ class StorageRepository:
                 ).where(AgentModel.team_id == team_id)
 
             result = await session.execute(stmt)
-            return [
-                {"tool_name": row.tool_name, "count": row.count}
-                for row in result.all()
-            ]
+            return [{"tool_name": row.tool_name, "count": row.count} for row in result.all()]
 
     async def get_activity_timeline(
         self,
@@ -1211,10 +1199,7 @@ class StorageRepository:
                 ).where(AgentModel.team_id == team_id)
 
             result = await session.execute(stmt)
-            return [
-                {"hour": row.hour, "count": row.count}
-                for row in result.all()
-            ]
+            return [{"hour": row.hour, "count": row.count} for row in result.all()]
 
     async def get_agent_productivity(
         self,
@@ -1336,14 +1321,16 @@ class StorageRepository:
 
                 utilization = round(row.activity_count / span_hours, 2) if span_hours > 0 else 0
 
-                output.append({
-                    "agent_id": row.agent_id,
-                    "agent_name": row.agent_name or "unknown",
-                    "activity_count": row.activity_count,
-                    "tools_used": row.tools_used,
-                    "span_hours": round(span_hours, 2),
-                    "activities_per_hour": utilization,
-                    "first_active": row.first_active.isoformat() if row.first_active else None,
-                    "last_active": row.last_active.isoformat() if row.last_active else None,
-                })
+                output.append(
+                    {
+                        "agent_id": row.agent_id,
+                        "agent_name": row.agent_name or "unknown",
+                        "activity_count": row.activity_count,
+                        "tools_used": row.tools_used,
+                        "span_hours": round(span_hours, 2),
+                        "activities_per_hour": utilization,
+                        "first_active": row.first_active.isoformat() if row.first_active else None,
+                        "last_active": row.last_active.isoformat() if row.last_active else None,
+                    }
+                )
             return output

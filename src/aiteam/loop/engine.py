@@ -193,7 +193,9 @@ class LoopEngine:
         old_phase = state.phase
         state.phase = next_phase
         await self._save_state(state)
-        logger.info("Loop advanced: %s → %s (trigger=%s)", old_phase.value, next_phase.value, trigger)
+        logger.info(
+            "Loop advanced: %s → %s (trigger=%s)", old_phase.value, next_phase.value, trigger
+        )
         return state
 
     async def pause(self, team_id: str) -> LoopState:
@@ -259,9 +261,9 @@ class LoopEngine:
 
         # 2. Get open issues
         open_issues = [
-            t for t in all_tasks
-            if t.config.get("task_type") == "issue"
-            and t.status not in (TaskStatus.COMPLETED,)
+            t
+            for t in all_tasks
+            if t.config.get("task_type") == "issue" and t.status not in (TaskStatus.COMPLETED,)
         ]
 
         # 3. Generate agenda text
@@ -290,7 +292,9 @@ class LoopEngine:
                 result_hint = ""
                 if t.result:
                     result_hint = f" — {t.result[:80]}"
-                agenda_lines.append(f"- [{t.priority}] {t.title or t.description[:60]}{result_hint}")
+                agenda_lines.append(
+                    f"- [{t.priority}] {t.title or t.description[:60]}{result_hint}"
+                )
             agenda_lines.append("")
 
         if open_issues:
@@ -301,13 +305,15 @@ class LoopEngine:
                 agenda_lines.append(f"- [{severity}/{category}] {t.title or t.description[:60]}")
             agenda_lines.append("")
 
-        agenda_lines.extend([
-            "## 讨论议程",
-            "1. 本轮完成情况回顾",
-            "2. 失败任务原因分析与对策",
-            "3. 未解决 Issue 处理计划",
-            "4. 下一步工作建议",
-        ])
+        agenda_lines.extend(
+            [
+                "## 讨论议程",
+                "1. 本轮完成情况回顾",
+                "2. 失败任务原因分析与对策",
+                "3. 未解决 Issue 处理计划",
+                "4. 下一步工作建议",
+            ]
+        )
 
         agenda_text = "\n".join(agenda_lines)
 
@@ -364,7 +370,10 @@ class LoopEngine:
         }
 
     async def get_task_wall(
-        self, team_id: str, horizon: str = "", priority: str = "",
+        self,
+        team_id: str,
+        horizon: str = "",
+        priority: str = "",
     ) -> dict[str, Any]:
         """Get the task wall view."""
         all_tasks = await self._repo.list_tasks(team_id)
@@ -400,7 +409,8 @@ class LoopEngine:
 
         # Sort completed tasks by completion time descending
         completed_tasks.sort(
-            key=lambda x: x.get("completed_at") or "", reverse=True,
+            key=lambda x: x.get("completed_at") or "",
+            reverse=True,
         )
 
         stats = {
@@ -447,7 +457,9 @@ class LoopEngine:
             "",
             f"- 已完成任务: {len(completed)}",
             f"- 失败任务: {len(failed)}",
-            f"- 平均任务耗时: {avg_duration:.1f} 分钟" if avg_duration else "- 平均任务耗时: 暂无数据",
+            f"- 平均任务耗时: {avg_duration:.1f} 分钟"
+            if avg_duration
+            else "- 平均任务耗时: 暂无数据",
         ]
         if top_agents:
             lines.append("- 高产出Agent:")
@@ -466,8 +478,13 @@ class LoopEngine:
         except Exception:
             logger.warning("保存反思记忆失败: team=%s", team_id)
 
-        logger.info("reflect完成: team=%s, cycle=%d, completed=%d, failed=%d",
-                    team_id, cycle, len(completed), len(failed))
+        logger.info(
+            "reflect完成: team=%s, cycle=%d, completed=%d, failed=%d",
+            team_id,
+            cycle,
+            len(completed),
+            len(failed),
+        )
         return {
             "completed": len(completed),
             "failed": len(failed),
@@ -503,7 +520,7 @@ class LoopEngine:
         # Extract reusable patterns from successful tasks (those with tags)
         tag_success: dict[str, int] = {}
         for t in completed:
-            for tag in (t.tags or []):
+            for tag in t.tags or []:
                 tag_success[tag] = tag_success.get(tag, 0) + 1
         for tag, count in tag_success.items():
             if count >= 2:
