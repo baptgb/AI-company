@@ -24,6 +24,18 @@ _TEAM_WITHOUT_MEMBERS_THRESHOLD = 5
 # Tool names considered "delegation" actions (calling these resets the counter)
 _DELEGATION_TOOLS = {"Agent", "TeamCreate", "SendMessage"}
 
+# Infrastructure tools only Leader can do — don't count toward B0.9 threshold
+_INFRA_TOOLS = {
+    # MCP task management (Leader managing task wall)
+    "mcp__ai-team-os__task_create", "mcp__ai-team-os__task_update",
+    "mcp__ai-team-os__taskwall_view", "mcp__ai-team-os__task_status",
+    # MCP team/project management
+    "mcp__ai-team-os__team_create", "mcp__ai-team-os__team_list",
+    "mcp__ai-team-os__agent_template_recommend", "mcp__ai-team-os__agent_template_list",
+    # MCP meeting management
+    "mcp__ai-team-os__meeting_create", "mcp__ai-team-os__meeting_conclude",
+}
+
 
 def _load_supervisor_state() -> dict:
     """Load supervisor state file; return default value if missing or corrupted."""
@@ -89,6 +101,10 @@ def _check_leader_doing_too_much(event_data: dict, state: dict) -> str | None:
 
     if tool_name in _DELEGATION_TOOLS:
         state["leader_consecutive_calls"] = 0
+        return None
+
+    # Infrastructure tools (task wall, team mgmt) don't count toward threshold
+    if tool_name in _INFRA_TOOLS:
         return None
 
     consecutive += 1
