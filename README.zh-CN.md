@@ -209,33 +209,36 @@ UserPromptSubmit → context_monitor.py            — 上下文使用率监控
 
 > **国内用户提示**：如果访问 GitHub 较慢，建议配置代理或使用 Gitee 镜像（如有）。
 
-### 三步启动
+### 四步启动
 
 ```bash
 # Step 1: 克隆仓库
 git clone https://github.com/CronusL-1141/AI-company.git
 cd AI-company/ai-team-os
 
-# Step 2: 安装（自动配置 MCP + Hooks）
+# Step 2: 安装（自动配置 MCP + Hooks + Agent 模板）
 python install.py
 
-# Step 3: 重启 Claude Code，OS 自动激活
+# Step 3: 启动 API 服务（保持此终端运行）
+python -m uvicorn aiteam.api.app:create_app --factory --host 0.0.0.0 --port 8000
+
+# Step 4: 重启 Claude Code，OS 自动激活
 # 验证：在 CC 中运行 → /mcp 查看 ai-team-os 工具是否挂载
 ```
 
 ### 验证安装
 
 ```bash
-# 检查 OS 健康状态
-curl http://localhost:8000/health
-# 期望: {"status": "ok", "version": "0.1.0"}
+# 检查 OS 健康状态（API 必须已启动）
+curl http://localhost:8000/api/health
+# 期望: {"status": "ok"}
 
 # 通过 CC 创建第一个团队
 # 在 Claude Code 中输入：
 # "帮我创建一个 web 开发团队，包含前端、后端和测试工程师"
 ```
 
-### 启动 Dashboard
+### 启动 Dashboard（可选）
 
 ```bash
 cd dashboard

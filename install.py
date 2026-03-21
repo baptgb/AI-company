@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""AI Team OS 一键安装脚本."""
+"""AI Team OS one-click installer."""
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -9,80 +8,263 @@ from pathlib import Path
 
 
 def check_command(cmd: str) -> bool:
-    """检查命令是否可用."""
+    """Check if a command is available."""
     return shutil.which(cmd) is not None
 
 
 def run(args: list[str], cwd: str | None = None, **kwargs) -> subprocess.CompletedProcess:
-    """运行子进程，失败时打印友好错误."""
+    """Run subprocess, print friendly error on failure."""
     try:
         return subprocess.run(
             args, cwd=cwd, check=True,
-            # Windows 上 npm 需要 shell=True
             shell=(sys.platform == "win32" and args[0] in ("npm", "npx")),
             **kwargs,
         )
     except subprocess.CalledProcessError as e:
-        print(f"[FAIL] 命令失败: {' '.join(args)}")
+        print(f"[FAIL] Command failed: {' '.join(args)}")
         raise SystemExit(1) from e
     except FileNotFoundError:
-        print(f"[FAIL] 找不到命令: {args[0]}")
+        print(f"[FAIL] Command not found: {args[0]}")
         raise SystemExit(1)
 
 
+def _hook_command_exists(hooks_list: list, command_fragment: str) -> bool:
+    """Check if a hook command containing the fragment already exists in list."""
+    for group in hooks_list:
+        for hook in group.get("hooks", []):
+            if command_fragment in hook.get("command", ""):
+                return True
+    return False
+
+
+def register_hooks(project_root: Path) -> None:
+    """Merge AI Team OS hooks into ~/.claude/settings.json."""
+    # All hook scripts live in plugin/hooks/
+    hooks_dir = project_root / "plugin" / "hooks"
+    settings_path = Path.home() / ".claude" / "settings.json"
+
+    py = sys.executable  # use same interpreter that ran install.py
+
+    # Quote path for Windows (handles spaces in path); use forward slashes for portability
+    def q(p: Path) -> str:
+        return f'"{str(p).replace(chr(92), "/")}"'
+
+    se = hooks_dir / "send_event.py"
+    wf = hooks_dir / "workflow_reminder.py"
+    sb = hooks_dir / "session_bootstrap.py"
+    isc = hooks_dir / "inject_subagent_context.py"
+
+    # Build hook entry: returns (fragment, command, timeout) or None if script missing.
+    # fragment is a unique substring to detect duplicate hooks in existing commands.
+    def py_hook(script: Path, arg: str, timeout: int) -> tuple[str, str, int] | None:
+        if not script.exists():
+            return None
+        cmd = f'{q(py)} {q(script)}' + (f' {arg}' if arg else '')
+        # Include arg in fragment to distinguish e.g. "send_event.py PreToolUse" vs "PostToolUse"
+        fragment = f'{script.name}" {arg}' if arg else script.name
+        return (fragment, cmd, timeout)
+
+    def build_entries(*hooks) -> list[tuple[str, str, int]]:
+        return [h for h in hooks if h is not None]
+
+    # Hooks to register: event -> (matcher, list of (fragment, full_command, timeout))
+    # PreToolUse / PostToolUse use matcher "*" to match all tools; others use ""
+    desired: dict[str, tuple[str, list[tuple[str, str, int]]]] = {
+        "PreToolUse": ("*", build_entries(
+            py_hook(wf, "PreToolUse", 3),
+            py_hook(se, "PreToolUse", 3),
+        )),
+        "PostToolUse": ("*", build_entries(
+            py_hook(wf, "PostToolUse", 3),
+            py_hook(se, "PostToolUse", 3),
+        )),
+        "SessionStart": ("", build_entries(
+            py_hook(sb, "SessionStart", 5),
+            py_hook(se, "SessionStart", 5),
+        )),
+        "SubagentStart": ("", build_entries(
+            py_hook(isc, "SubagentStart", 5),
+            py_hook(se, "SubagentStart", 5),
+        )),
+        "SubagentStop": ("", build_entries(
+            py_hook(se, "SubagentStop", 5),
+        )),
+        "SessionEnd": ("", build_entries(
+            py_hook(se, "SessionEnd", 5),
+        )),
+        "Stop": ("", build_entries(
+            py_hook(se, "Stop", 5),
+        )),
+    }
+
+    # Load or create settings
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            settings = {}
+    else:
+        settings = {}
+
+    existing_hooks: dict = settings.setdefault("hooks", {})
+    added = 0
+
+    for event, (matcher, entries) in desired.items():
+        event_list: list = existing_hooks.setdefault(event, [])
+
+        # Find or create the hook group for the correct matcher
+        target_group = None
+        for group in event_list:
+            if group.get("matcher", "") == matcher:
+                target_group = group
+                break
+        if target_group is None:
+            target_group = {"matcher": matcher, "hooks": []}
+            event_list.append(target_group)
+
+        for fragment, command, timeout in entries:
+            if not _hook_command_exists(event_list, fragment):
+                target_group["hooks"].append({
+                    "type": "command",
+                    "command": command,
+                    "timeout": timeout,
+                })
+                added += 1
+
+    settings_path.write_text(
+        json.dumps(settings, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    if added > 0:
+        print(f"[OK] Registered {added} new hook(s) into settings.json")
+    else:
+        print("[OK] All hooks already registered, skipped")
+
+
+def copy_agent_templates(project_root: Path) -> None:
+    """Copy .claude/agents/*.md to ~/.claude/agents/ (skip existing)."""
+    src_agents = project_root / ".claude" / "agents"
+    dst_agents = Path.home() / ".claude" / "agents"
+
+    if not src_agents.exists():
+        print("[SKIP] No agent templates found in .claude/agents/")
+        return
+
+    dst_agents.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    skipped = 0
+
+    for template in src_agents.glob("*.md"):
+        dst = dst_agents / template.name
+        if dst.exists():
+            skipped += 1
+        else:
+            shutil.copy2(template, dst)
+            copied += 1
+
+    print(f"[OK] Agent templates: {copied} copied, {skipped} already existed (skipped)")
+
+
+def verify_installation(project_root: Path) -> bool:
+    """Run post-install checks and report results."""
+    print()
+    print("Verifying installation...")
+
+    agents_dir = Path.home() / ".claude" / "agents"
+    has_templates = agents_dir.exists() and any(agents_dir.glob("*.md"))
+
+    settings_path = Path.home() / ".claude" / "settings.json"
+    has_hooks = False
+    if settings_path.exists():
+        try:
+            cfg = json.loads(settings_path.read_text(encoding="utf-8"))
+            has_hooks = bool(cfg.get("hooks"))
+        except Exception:
+            has_hooks = False
+
+    checks = [
+        (".mcp.json present", (project_root / ".mcp.json").exists()),
+        ("~/.claude/agents/ templates", has_templates),
+        ("~/.claude/settings.json hooks", has_hooks),
+        ("Hook scripts (plugin/hooks/)", (project_root / "plugin" / "hooks" / "send_event.py").exists()),
+        ("Python package (aiteam)", _check_package("aiteam")),
+    ]
+
+    all_ok = True
+    for label, ok in checks:
+        status = "[OK]" if ok else "[FAIL]"
+        print(f"  {status} {label}")
+        if not ok:
+            all_ok = False
+
+    return all_ok
+
+
+def _check_package(pkg: str) -> bool:
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "show", pkg],
+            capture_output=True, text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def main():
-    print("=" * 40)
-    print("  AI Team OS 安装")
-    print("=" * 40)
+    print("=" * 50)
+    print("  AI Team OS Installer")
+    print("=" * 50)
     print()
 
     project_root = Path(__file__).resolve().parent
 
-    # 1. 检查 Python 版本
+    # 1. Check Python version
     if sys.version_info < (3, 11):
-        print("[FAIL] 需要 Python 3.11+，当前版本:", sys.version)
+        print(f"[FAIL] Python 3.11+ required. Current: {sys.version}")
         sys.exit(1)
     print(f"[OK] Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
 
-    # 2. 检查 Node.js（可选，仅 Dashboard 需要）
+    # 2. Check Node.js (optional, for Dashboard)
     has_node = check_command("node")
     has_npm = check_command("npm")
     if has_node and has_npm:
         result = subprocess.run(["node", "--version"], capture_output=True, text=True)
         print(f"[OK] Node.js {result.stdout.strip()}")
     else:
-        print("[WARN] 未检测到 Node.js/npm，将跳过 Dashboard 构建")
-        print("       Dashboard 是可选的，核心功能不受影响")
+        print("[WARN] Node.js/npm not found — Dashboard build will be skipped")
+        print("       Dashboard is optional; core functionality is unaffected")
 
     print()
 
-    # 3. 安装 Python 包
-    print("[...] 安装 Python 依赖...")
+    # 3. Install Python packages
+    print("[...] Installing Python dependencies...")
     run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=str(project_root))
-    print("[OK] Python 依赖安装完成")
+    print("[OK] Python dependencies installed")
     print()
 
-    # 4. 构建 Dashboard（可选）
+    # 4. Build Dashboard (optional)
     dashboard_dir = project_root / "dashboard"
     if dashboard_dir.exists() and has_node and has_npm:
-        print("[...] 安装 Dashboard 依赖...")
+        print("[...] Installing Dashboard dependencies...")
         run(["npm", "install"], cwd=str(dashboard_dir))
-        print("[OK] Dashboard 依赖安装完成")
+        print("[OK] Dashboard dependencies installed")
 
-        print("[...] 构建 Dashboard...")
+        print("[...] Building Dashboard...")
         run(["npm", "run", "build"], cwd=str(dashboard_dir))
-        print("[OK] Dashboard 构建完成")
+        print("[OK] Dashboard built")
         print()
     elif dashboard_dir.exists():
-        print("[SKIP] Dashboard 构建跳过（需要 Node.js）")
+        print("[SKIP] Dashboard build skipped (Node.js required)")
         print()
 
-    # 5. 创建数据目录
+    # 5. Create data directory
     data_dir = Path.home() / ".claude" / "data" / "ai-team-os"
     data_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[OK] 数据目录: {data_dir}")
+    print(f"[OK] Data directory: {data_dir}")
 
-    # 6. 生成 .mcp.json（如不存在）
+    # 6. Generate .mcp.json (if not present)
     mcp_json = project_root / ".mcp.json"
     if not mcp_json.exists():
         config = {
@@ -98,25 +280,51 @@ def main():
             }
         }
         mcp_json.write_text(json.dumps(config, indent=2), encoding="utf-8")
-        print("[OK] 生成 .mcp.json")
+        print("[OK] Generated .mcp.json")
     else:
-        print("[OK] .mcp.json 已存在，跳过")
+        print("[OK] .mcp.json already exists, skipped")
 
-    # 7. 完成
+    # 7. Register hooks into ~/.claude/settings.json
+    print("[...] Registering hooks into ~/.claude/settings.json...")
+    register_hooks(project_root)
+
+    # 8. Copy agent templates to ~/.claude/agents/
+    print("[...] Copying agent templates to ~/.claude/agents/...")
+    copy_agent_templates(project_root)
+
+    # 9. Verify installation
+    all_ok = verify_installation(project_root)
+
+    # 10. Done
     print()
-    print("=" * 40)
-    print("  安装完成!")
-    print("=" * 40)
+    print("=" * 50)
+    print("  Installation complete!")
+    print("=" * 50)
     print()
-    print("使用方法:")
-    print("  1. 在 Claude Code 中打开此项目目录")
-    print("  2. MCP tools 会自动加载")
-    print("  3. 运行 /os-up 创建团队并启动系统")
-    print("  4. 运行 /os-status 查看系统状态")
+    print("Next steps:")
+    print()
+    print("  Step 1 — Start the API server (required for MCP tools):")
+    print("    python -m uvicorn aiteam.api.app:create_app --factory --host 0.0.0.0 --port 8000")
+    print()
+    print("  Step 2 — Restart Claude Code")
+    print("    Hooks and MCP tools activate on next launch.")
+    print("    Verify: run /mcp in Claude Code and check ai-team-os tools are mounted.")
+    print()
+    print("  Step 3 — Verify the API is running:")
+    print("    curl http://localhost:8000/api/health")
+    print("    Expected: {\"status\": \"ok\"}")
+    print()
     if dashboard_dir.exists() and has_node:
-        print("  5. Dashboard: http://localhost:8000")
+        print("  Optional — Start the Dashboard:")
+        print("    cd dashboard && npm run dev")
+        print("    Visit: http://localhost:5173")
+        print()
+    print("  Step 4 — Create your first team in Claude Code:")
+    print('    /os-up  (or type: "Create a web dev team with frontend, backend, and QA")')
     print()
-    print("更多信息请参阅 plugin/README.md")
+    if not all_ok:
+        print("[WARN] Some checks failed. Review the output above before proceeding.")
+    print("For more information: plugin/README.md")
 
 
 if __name__ == "__main__":
