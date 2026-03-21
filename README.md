@@ -234,9 +234,8 @@ npm run dev
 ![Decision Timeline](docs/screenshots/decision-timeline.png)
 <!-- 截图待替换：展示Leader的决策记录、意图透视、事件流 -->
 
-### 失败炼金术
-![Failure Analysis](docs/screenshots/failure-analysis.png)
-<!-- 截图待替换：展示失败模式库、根因分析报告、预警提示 -->
+### 活动分析
+![Analytics](docs/screenshots/analytics.png)
 
 ---
 
