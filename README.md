@@ -224,18 +224,21 @@ npm run dev
 
 ### 指挥中心
 ![Command Center](docs/screenshots/dashboard-home.png)
-<!-- 截图待替换：展示团队总览、Agent状态卡片、近期活动流 -->
 
 ### 任务看板
 ![Task Board](docs/screenshots/task-board.png)
-<!-- 截图待替换：展示任务墙、Loop引擎状态、任务优先级队列 -->
 
-### 决策时间线
+### 项目详情 & 决策时间线
 ![Decision Timeline](docs/screenshots/decision-timeline.png)
-<!-- 截图待替换：展示Leader的决策记录、意图透视、事件流 -->
+
+### 会议室
+![Meetings](docs/screenshots/meetings.png)
 
 ### 活动分析
 ![Analytics](docs/screenshots/analytics.png)
+
+### 事件日志
+![Events](docs/screenshots/events.png)
 
 ---
 
