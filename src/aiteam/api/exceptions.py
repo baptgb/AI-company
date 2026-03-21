@@ -1,7 +1,7 @@
-"""AI Team OS — 自定义异常."""
+"""AI Team OS — Custom exceptions."""
 
 from __future__ import annotations
 
 
 class NotFoundError(ValueError):
-    """资源不存在异常 — 映射为HTTP 404."""
+    """Resource not found exception — maps to HTTP 404."""

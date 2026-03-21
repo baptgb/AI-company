@@ -1,3 +1,3 @@
-"""AI Team OS — 通用可复用的AI Agent团队操作系统框架."""
+"""AI Team OS — A general-purpose, reusable AI Agent team operating system framework."""
 
 __version__ = "0.1.0"

@@ -1,6 +1,7 @@
-"""AI Team OS — API请求/响应Schema.
+"""AI Team OS — API request/response schemas.
 
-定义统一响应包装和请求模型。Response的data字段复用types.py中的Pydantic模型。
+Defines unified response wrappers and request models.
+Response data fields reuse Pydantic models from types.py.
 """
 
 from __future__ import annotations
@@ -13,12 +14,12 @@ T = TypeVar("T")
 
 
 # ============================================================
-# 统一响应包装
+# Unified response wrappers
 # ============================================================
 
 
 class APIResponse(BaseModel, Generic[T]):
-    """统一API响应."""
+    """Unified API response."""
 
     success: bool = True
     data: T | None = None
@@ -26,7 +27,7 @@ class APIResponse(BaseModel, Generic[T]):
 
 
 class APIListResponse(BaseModel, Generic[T]):
-    """统一列表响应."""
+    """Unified list response."""
 
     success: bool = True
     data: list[T] = Field(default_factory=list)
@@ -35,12 +36,12 @@ class APIListResponse(BaseModel, Generic[T]):
 
 
 # ============================================================
-# 请求模型
+# Request models
 # ============================================================
 
 
 class TeamCreate(BaseModel):
-    """创建团队请求."""
+    """Create team request."""
 
     name: str
     mode: str = "coordinate"
@@ -50,14 +51,14 @@ class TeamCreate(BaseModel):
 
 
 class TeamUpdate(BaseModel):
-    """更新团队请求."""
+    """Update team request."""
 
     mode: str | None = None
     status: str | None = None
 
 
 class AgentCreate(BaseModel):
-    """创建Agent请求."""
+    """Create Agent request."""
 
     name: str
     role: str
@@ -66,14 +67,14 @@ class AgentCreate(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    """创建任务请求."""
+    """Create task request."""
 
     title: str
     description: str = ""
 
 
 class TaskRun(BaseModel):
-    """运行任务请求."""
+    """Run task request."""
 
     description: str
     title: str = ""
@@ -86,7 +87,7 @@ class TaskRun(BaseModel):
 
 
 class MemoryQuery(BaseModel):
-    """记忆查询请求."""
+    """Memory query request."""
 
     scope: str = "global"
     scope_id: str = "system"
@@ -95,14 +96,14 @@ class MemoryQuery(BaseModel):
 
 
 class AgentStatusUpdate(BaseModel):
-    """更新Agent状态请求."""
+    """Update Agent status request."""
 
     status: str
     current_task: str | None = None
 
 
 class ProjectCreate(BaseModel):
-    """创建项目请求."""
+    """Create project request."""
 
     name: str
     root_path: str = ""
@@ -111,7 +112,7 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectUpdate(BaseModel):
-    """更新项目请求."""
+    """Update project request."""
 
     name: str | None = None
     root_path: str | None = None
@@ -120,7 +121,7 @@ class ProjectUpdate(BaseModel):
 
 
 class PhaseCreate(BaseModel):
-    """创建阶段请求."""
+    """Create phase request."""
 
     name: str
     description: str = ""
@@ -129,27 +130,27 @@ class PhaseCreate(BaseModel):
 
 
 class PhaseStatusUpdate(BaseModel):
-    """更新阶段状态请求."""
+    """Update phase status request."""
 
     status: str
 
 
 class MeetingCreate(BaseModel):
-    """创建会议请求."""
+    """Create meeting request."""
 
     topic: str
     participants: list[str] = Field(default_factory=list)
 
 
 class SubtaskInput(BaseModel):
-    """子任务输入."""
+    """Subtask input."""
 
     title: str
     description: str = ""
 
 
 class TaskDecompose(BaseModel):
-    """任务拆解请求."""
+    """Task decomposition request."""
 
     title: str
     description: str = ""
@@ -162,7 +163,7 @@ class TaskDecompose(BaseModel):
 
 
 class TaskCreateBody(BaseModel):
-    """项目级任务创建请求."""
+    """Project-level task creation request."""
 
     title: str
     description: str = ""
@@ -172,7 +173,7 @@ class TaskCreateBody(BaseModel):
 
 
 class IssueReport(BaseModel):
-    """上报问题请求."""
+    """Report issue request."""
 
     title: str
     description: str = ""
@@ -181,7 +182,7 @@ class IssueReport(BaseModel):
 
 
 class MemoEntry(BaseModel):
-    """任务Memo记录请求."""
+    """Task memo entry request."""
 
     author: str = "leader"
     content: str
@@ -189,7 +190,7 @@ class MemoEntry(BaseModel):
 
 
 class MeetingMessageCreate(BaseModel):
-    """创建会议消息请求."""
+    """Create meeting message request."""
 
     agent_id: str
     agent_name: str

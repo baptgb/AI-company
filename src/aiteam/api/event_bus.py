@@ -1,4 +1,4 @@
-"""AI Team OS — 统一事件总线."""
+"""AI Team OS — Unified event bus."""
 
 from __future__ import annotations
 
@@ -13,26 +13,26 @@ logger = logging.getLogger(__name__)
 
 
 class EventBus:
-    """统一事件发射器 — 同时持久化到DB和通过WS广播."""
+    """Unified event emitter — persists to DB and broadcasts via WS simultaneously."""
 
     def __init__(self, repo: StorageRepository) -> None:
         self._repo = repo
 
     async def emit(self, event_type: str, source: str, data: dict) -> Event:
-        """发射事件: 1) 写入数据库 2) WS广播.
+        """Emit an event: 1) write to database 2) broadcast via WS.
 
         Args:
-            event_type: 事件类型（如 "team.created"）。
-            source: 事件来源（如 "team:<id>"）。
-            data: 事件附带数据。
+            event_type: Event type (e.g. "team.created").
+            source: Event source (e.g. "team:<id>").
+            data: Event payload data.
 
         Returns:
-            持久化后的 Event 对象。
+            The persisted Event object.
         """
-        # 持久化
+        # Persist
         event = await self._repo.create_event(event_type, source, data)
 
-        # WS广播
+        # WS broadcast
         try:
             ws_event = WSEvent(
                 channel=event_type,

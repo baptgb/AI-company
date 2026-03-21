@@ -1,6 +1,6 @@
-"""AI Team OS — WebSocket连接管理器.
+"""AI Team OS — WebSocket connection manager.
 
-管理WebSocket连接的生命周期、频道订阅和事件广播。
+Manages WebSocket connection lifecycle, channel subscriptions, and event broadcasting.
 """
 
 from __future__ import annotations
@@ -13,41 +13,41 @@ from aiteam.api.ws.protocol import WSEvent
 
 
 class ConnectionManager:
-    """WebSocket连接管理器."""
+    """WebSocket connection manager."""
 
     def __init__(self) -> None:
-        # 连接ID → WebSocket实例
+        # Connection ID -> WebSocket instance
         self._connections: dict[str, WebSocket] = {}
-        # 连接ID → 订阅的频道集合
+        # Connection ID -> subscribed channel set
         self._subscriptions: dict[str, set[str]] = {}
-        # 频道 → 订阅该频道的连接ID集合（加速查找）
+        # Channel -> set of connection IDs subscribed to it (accelerated lookup)
         self._channel_index: dict[str, set[str]] = {}
 
     @property
     def active_count(self) -> int:
-        """当前活跃连接数."""
+        """Current active connection count."""
         return len(self._connections)
 
     async def connect(self, conn_id: str, websocket: WebSocket) -> None:
-        """注册新的WebSocket连接."""
+        """Register a new WebSocket connection."""
         await websocket.accept()
         self._connections[conn_id] = websocket
         self._subscriptions[conn_id] = set()
 
     def disconnect(self, conn_id: str) -> None:
-        """注销WebSocket连接."""
-        # 清理频道索引
+        """Unregister a WebSocket connection."""
+        # Clean up channel index
         channels = self._subscriptions.pop(conn_id, set())
         for channel in channels:
             if channel in self._channel_index:
                 self._channel_index[channel].discard(conn_id)
                 if not self._channel_index[channel]:
                     del self._channel_index[channel]
-        # 移除连接
+        # Remove connection
         self._connections.pop(conn_id, None)
 
     def subscribe(self, conn_id: str, channel: str) -> None:
-        """订阅频道."""
+        """Subscribe to a channel."""
         if conn_id not in self._subscriptions:
             return
         self._subscriptions[conn_id].add(channel)
@@ -56,7 +56,7 @@ class ConnectionManager:
         self._channel_index[channel].add(conn_id)
 
     def unsubscribe(self, conn_id: str, channel: str) -> None:
-        """取消订阅频道."""
+        """Unsubscribe from a channel."""
         if conn_id in self._subscriptions:
             self._subscriptions[conn_id].discard(channel)
         if channel in self._channel_index:
@@ -65,14 +65,14 @@ class ConnectionManager:
                 del self._channel_index[channel]
 
     async def broadcast_event(self, event: WSEvent) -> None:
-        """根据频道模式匹配广播事件.
+        """Broadcast events by channel pattern matching.
 
-        使用fnmatch通配符匹配，例如 "team.*" 会匹配 "team.created" 频道。
+        Uses fnmatch wildcard matching, e.g. "team.*" matches "team.created" channel.
         """
         target_conn_ids: set[str] = set()
 
         for channel, conn_ids in self._channel_index.items():
-            # 支持通配符匹配：订阅的频道模式匹配事件频道
+            # Wildcard matching: subscription channel pattern matches event channel
             if fnmatch(event.channel, channel):
                 target_conn_ids.update(conn_ids)
 
@@ -91,10 +91,10 @@ class ConnectionManager:
             except Exception:
                 disconnected.append(conn_id)
 
-        # 清理断开的连接
+        # Clean up disconnected connections
         for conn_id in disconnected:
             self.disconnect(conn_id)
 
 
-# 全局单例
+# Global singleton
 ws_manager = ConnectionManager()

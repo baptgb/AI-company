@@ -1,7 +1,7 @@
-"""AI Team OS — 全局共享类型定义.
+"""AI Team OS — Global shared type definitions.
 
-所有模块引用此文件中的类型，不自行定义数据模型。
-此文件由 tech-lead 统一管理，其他工程师只读引用。
+All modules reference types from this file; they do not define their own data models.
+This file is managed by the tech-lead; other engineers only read-reference it.
 """
 
 from __future__ import annotations
@@ -16,12 +16,12 @@ from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
 # ============================================================
-# 枚举类型
+# Enum types
 # ============================================================
 
 
 class OrchestrationMode(str, enum.Enum):
-    """团队编排模式."""
+    """Team orchestration mode."""
 
     COORDINATE = "coordinate"
     BROADCAST = "broadcast"
@@ -30,32 +30,32 @@ class OrchestrationMode(str, enum.Enum):
 
 
 class TaskStatus(str, enum.Enum):
-    """任务状态."""
+    """Task status."""
 
     PENDING = "pending"
-    BLOCKED = "blocked"  # 有未完成的依赖
+    BLOCKED = "blocked"  # Has unfinished dependencies
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
 
 
 class AgentStatus(str, enum.Enum):
-    """Agent状态 — 三状态模型."""
+    """Agent status — three-state model."""
 
-    BUSY = "busy"        # 工作中 — 正在执行工具调用
-    WAITING = "waiting"  # 等待 — 存活但等待输入（turn间隙）
-    OFFLINE = "offline"  # 关闭 — 已终止
+    BUSY = "busy"        # Working — actively executing tool calls
+    WAITING = "waiting"  # Waiting — alive but awaiting input (between turns)
+    OFFLINE = "offline"  # Offline — terminated
 
 
 class MeetingStatus(str, enum.Enum):
-    """会议状态."""
+    """Meeting status."""
 
     ACTIVE = "active"
     CONCLUDED = "concluded"
 
 
 class PhaseStatus(str, enum.Enum):
-    """阶段状态."""
+    """Phase status."""
 
     PLANNING = "planning"
     ACTIVE = "active"
@@ -64,7 +64,7 @@ class PhaseStatus(str, enum.Enum):
 
 
 class TeamStatus(str, enum.Enum):
-    """团队生命周期状态."""
+    """Team lifecycle status."""
 
     ACTIVE = "active"
     COMPLETED = "completed"
@@ -72,20 +72,20 @@ class TeamStatus(str, enum.Enum):
 
 
 class MeetingTemplate(str, enum.Enum):
-    """会议模板类型."""
+    """Meeting template type."""
 
-    BRAINSTORM = "brainstorm"          # 头脑风暴(4轮)
-    DECISION = "decision"              # 决策会议(3轮)
-    REVIEW = "review"                  # 评审会议(3轮)
-    RETROSPECTIVE = "retrospective"    # 复盘会议(3轮)
-    STANDUP = "standup"                # 站会(1轮)
-    DEBATE = "debate"                  # 辩论模式
+    BRAINSTORM = "brainstorm"          # Brainstorming (4 rounds)
+    DECISION = "decision"              # Decision meeting (3 rounds)
+    REVIEW = "review"                  # Review meeting (3 rounds)
+    RETROSPECTIVE = "retrospective"    # Retrospective meeting (3 rounds)
+    STANDUP = "standup"                # Standup (1 round)
+    DEBATE = "debate"                  # Debate mode
     LEAN_COFFEE = "lean_coffee"        # Lean Coffee
-    FREE = "free"                      # 自由讨论(默认)
+    FREE = "free"                      # Free discussion (default)
 
 
 class LoopPhase(str, enum.Enum):
-    """公司循环阶段."""
+    """Company loop phase."""
 
     IDLE = "idle"
     PLANNING = "planning"
@@ -97,7 +97,7 @@ class LoopPhase(str, enum.Enum):
 
 
 class TaskPriority(str, enum.Enum):
-    """任务优先级."""
+    """Task priority."""
 
     CRITICAL = "critical"
     HIGH = "high"
@@ -106,7 +106,7 @@ class TaskPriority(str, enum.Enum):
 
 
 class TaskHorizon(str, enum.Enum):
-    """任务时间跨度."""
+    """Task time horizon."""
 
     SHORT = "short"
     MID = "mid"
@@ -114,7 +114,7 @@ class TaskHorizon(str, enum.Enum):
 
 
 class MemoryScope(str, enum.Enum):
-    """记忆作用域."""
+    """Memory scope."""
 
     GLOBAL = "global"
     TEAM = "team"
@@ -123,7 +123,7 @@ class MemoryScope(str, enum.Enum):
 
 
 class EventType(str, enum.Enum):
-    """系统事件类型."""
+    """System event type."""
 
     # Team events
     TEAM_CREATED = "team.created"
@@ -176,7 +176,7 @@ class EventType(str, enum.Enum):
     SYSTEM_STOPPED = "system.stopped"
     SYSTEM_ERROR = "system.error"
 
-    # Decision events (TOP2驾驶舱 — 统一决策事件流)
+    # Decision events (TOP2 cockpit — unified decision event stream)
     DECISION_TASK_ASSIGNED = "decision.task_assigned"
     DECISION_APPROACH_CHOSEN = "decision.approach_chosen"
     DECISION_AGENT_SELECTED = "decision.agent_selected"
@@ -191,7 +191,7 @@ class EventType(str, enum.Enum):
 
 
 # ============================================================
-# 数据模型
+# Data models
 # ============================================================
 
 
@@ -200,7 +200,7 @@ def _new_id() -> str:
 
 
 class Project(BaseModel):
-    """项目数据模型."""
+    """Project data model."""
 
     id: str = Field(default_factory=_new_id)
     name: str
@@ -212,7 +212,7 @@ class Project(BaseModel):
 
 
 class Phase(BaseModel):
-    """阶段数据模型 — Project下的执行阶段."""
+    """Phase data model — execution phase under a Project."""
 
     id: str = Field(default_factory=_new_id)
     project_id: str
@@ -226,15 +226,15 @@ class Phase(BaseModel):
 
 
 class Team(BaseModel):
-    """团队数据模型."""
+    """Team data model."""
 
     id: str = Field(default_factory=_new_id)
     name: str
     mode: OrchestrationMode = OrchestrationMode.COORDINATE
     project_id: str | None = None
-    leader_agent_id: str | None = None  # 领导此团队的Leader agent
+    leader_agent_id: str | None = None  # Leader agent for this team
     status: TeamStatus = TeamStatus.ACTIVE
-    summary: str = ""  # 团队完成后的一句话总结
+    summary: str = ""  # One-line summary after team completion
     config: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -242,7 +242,7 @@ class Team(BaseModel):
 
 
 class Agent(BaseModel):
-    """Agent数据模型."""
+    """Agent data model."""
 
     id: str = Field(default_factory=_new_id)
     team_id: str
@@ -252,10 +252,10 @@ class Agent(BaseModel):
     model: str = "claude-opus-4-6"
     status: AgentStatus = AgentStatus.WAITING
     config: dict[str, Any] = Field(default_factory=dict)
-    source: str = "api"  # "api" = CLAUDE.md主动注册, "hook" = hooks自动捕获
-    session_id: str | None = None  # 关联的CC会话ID
-    cc_tool_use_id: str | None = None  # 关联CC内部agent ID
-    current_task: str | None = None  # 当前正在执行的任务/活动描述
+    source: str = "api"  # "api" = registered via CLAUDE.md, "hook" = auto-captured by hooks
+    session_id: str | None = None  # Associated CC session ID
+    cc_tool_use_id: str | None = None  # Associated CC internal agent ID
+    current_task: str | None = None  # Currently executing task/activity description
     project_id: str | None = None
     current_phase_id: str | None = None
     created_at: datetime = Field(default_factory=datetime.now)
@@ -263,7 +263,7 @@ class Agent(BaseModel):
 
 
 class Task(BaseModel):
-    """任务数据模型."""
+    """Task data model."""
 
     id: str = Field(default_factory=_new_id)
     team_id: str | None = None
@@ -288,7 +288,7 @@ class Task(BaseModel):
 
 
 class LoopState(BaseModel):
-    """公司循环状态 — 每个团队一个."""
+    """Company loop state — one per team."""
 
     team_id: str
     phase: LoopPhase = LoopPhase.IDLE
@@ -296,11 +296,11 @@ class LoopState(BaseModel):
     current_cycle: int = 0
     completed_tasks_count: int = 0
     current_task_id: str | None = None
-    review_interval: int = 5  # 每N个任务触发回顾
+    review_interval: int = 5  # Trigger review every N tasks
 
 
 class Memory(BaseModel):
-    """记忆数据模型."""
+    """Memory data model."""
 
     id: str = Field(default_factory=_new_id)
     scope: MemoryScope
@@ -312,7 +312,7 @@ class Memory(BaseModel):
 
 
 class Event(BaseModel):
-    """系统事件数据模型."""
+    """System event data model."""
 
     id: str = Field(default_factory=_new_id)
     type: EventType
@@ -322,7 +322,7 @@ class Event(BaseModel):
 
 
 class Meeting(BaseModel):
-    """会议数据模型."""
+    """Meeting data model."""
 
     id: str = Field(default_factory=_new_id)
     team_id: str
@@ -335,7 +335,7 @@ class Meeting(BaseModel):
 
 
 class MeetingMessage(BaseModel):
-    """会议消息数据模型."""
+    """Meeting message data model."""
 
     id: str = Field(default_factory=_new_id)
     meeting_id: str
@@ -347,27 +347,27 @@ class MeetingMessage(BaseModel):
 
 
 class AgentActivity(BaseModel):
-    """Agent活动记录——记录agent的每次工具调用."""
+    """Agent activity record — logs each agent tool call."""
 
     id: str = Field(default_factory=_new_id)
     agent_id: str
     session_id: str
-    tool_name: str          # 工具名称 (Bash, Edit, Read, Agent等)
-    input_summary: str = ""  # 输入摘要 (如命令、文件路径)
-    output_summary: str = ""  # 输出摘要 (截断到500字符)
+    tool_name: str          # Tool name (Bash, Edit, Read, Agent, etc.)
+    input_summary: str = ""  # Input summary (e.g. command, file path)
+    output_summary: str = ""  # Output summary (truncated to 500 chars)
     timestamp: datetime = Field(default_factory=datetime.now)
-    duration_ms: int | None = None  # 工具调用耗时（毫秒），由Pre→Post关联填充
+    duration_ms: int | None = None  # Tool call duration (ms), populated by Pre->Post correlation
     status: str = "completed"       # "running" | "completed" | "error"
-    error: str | None = None        # 错误信息
+    error: str | None = None        # Error message
 
 
 # ============================================================
-# 结果类型
+# Result types
 # ============================================================
 
 
 class TaskResult(BaseModel):
-    """任务执行结果."""
+    """Task execution result."""
 
     task_id: str
     status: TaskStatus
@@ -377,7 +377,7 @@ class TaskResult(BaseModel):
 
 
 class TeamStatusSummary(BaseModel):
-    """团队状态摘要."""
+    """Team status summary."""
 
     team: Team
     agents: list[Agent]
@@ -387,20 +387,20 @@ class TeamStatusSummary(BaseModel):
 
 
 # ============================================================
-# LangGraph 状态类型
+# LangGraph state types
 # ============================================================
 
 
 class TeamState(dict):
-    """LangGraph StateGraph 的状态定义.
+    """LangGraph StateGraph state definition.
 
-    使用TypedDict风格，但通过dict基类兼容LangGraph。
+    Uses TypedDict style but inherits from dict for LangGraph compatibility.
     """
 
     pass
 
 
-# TeamState 的字段定义（用于 StateGraph 的 channels）
+# TeamState field definitions (used for StateGraph channels)
 TEAM_STATE_CHANNELS = {
     "team_id": str,
     "current_task": str,

@@ -1,4 +1,4 @@
-"""AI Team OS — API模块.
+"""AI Team OS — API module.
 
-提供FastAPI REST API和WebSocket实时推送。
+Provides FastAPI REST API and WebSocket real-time broadcasting.
 """

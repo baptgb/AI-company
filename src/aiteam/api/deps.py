@@ -1,6 +1,6 @@
-"""AI Team OS — API依赖注入.
+"""AI Team OS — API dependency injection.
 
-提供 TeamManager 单例和 StorageRepository 的 lifespan 管理。
+Provides TeamManager singleton and StorageRepository lifespan management.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from aiteam.types import AgentStatus
 
 logger = logging.getLogger(__name__)
 
-# 模块级单例
+# Module-level singletons
 _repository: StorageRepository | None = None
 _memory_store: MemoryStore | None = None
 _event_bus: EventBus | None = None
@@ -34,14 +34,14 @@ _loop_engine: LoopEngine | None = None
 
 
 async def _run_migrations(db_url: str | None = None) -> None:
-    """运行数据库迁移 — 为现有表添加新列.
+    """Run database migrations — add new columns to existing tables.
 
-    SQLAlchemy create_all 只创建不存在的表，不会 ALTER 已有表。
-    此函数检查并添加 M3.1 新增的列。
+    SQLAlchemy create_all only creates non-existing tables, it won't ALTER existing ones.
+    This function checks and adds columns introduced in M3.1.
     """
     engine = get_engine(db_url)
 
-    # 需要添加的列: (表名, 列名, 列类型SQL)
+    # Columns to add: (table_name, column_name, column_type_sql)
     migrations: list[tuple[str, str, str]] = [
         ("teams", "project_id", "VARCHAR(36)"),
         ("teams", "status", "VARCHAR(20) DEFAULT 'active'"),
@@ -59,7 +59,7 @@ async def _run_migrations(db_url: str | None = None) -> None:
 
     async with engine.connect() as conn:
         for table_name, col_name, col_type in migrations:
-            # 检查列是否已存在
+            # Check if column already exists
             has_column = await conn.run_sync(
                 lambda sync_conn, t=table_name, c=col_name: c
                 in [col["name"] for col in inspect(sync_conn).get_columns(t)]
@@ -71,21 +71,21 @@ async def _run_migrations(db_url: str | None = None) -> None:
                 await conn.execute(
                     text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
                 )
-                logger.info("迁移: %s 表添加列 %s", table_name, col_name)
+                logger.info("Migration: added column %s to table %s", col_name, table_name)
 
-        # 值迁移: idle → waiting（三状态模型升级）
+        # Value migration: idle -> waiting (three-state model upgrade)
         await conn.execute(text("UPDATE agents SET status='waiting' WHERE status='idle'"))
 
-        # 迁移: tasks.team_id 从 NOT NULL 改为 nullable（支持项目级任务）
+        # Migration: tasks.team_id from NOT NULL to nullable (support project-level tasks)
         team_id_nullable = await conn.run_sync(
             lambda sync_conn: next(
                 (col["nullable"] for col in inspect(sync_conn).get_columns("tasks")
                  if col["name"] == "team_id"),
-                True,  # 如果找不到列，跳过
+                True,  # If column not found, skip
             ) if inspect(sync_conn).has_table("tasks") else True
         )
         if not team_id_nullable:
-            logger.info("迁移: tasks 表 team_id 列改为 nullable（支持项目级任务）")
+            logger.info("Migration: rebuilding tasks table with nullable team_id (project-level tasks)")
             await conn.execute(text(
                 "CREATE TABLE tasks_new AS SELECT * FROM tasks"
             ))
@@ -119,27 +119,27 @@ async def _run_migrations(db_url: str | None = None) -> None:
             ))
             await conn.execute(text("DROP TABLE tasks_new"))
             await conn.execute(text("CREATE INDEX ix_tasks_team_id ON tasks (team_id)"))
-            logger.info("迁移: tasks 表重建完成")
+            logger.info("Migration: tasks table rebuild complete")
 
         await conn.commit()
 
 
 async def _auto_create_projects(repo: StorageRepository) -> None:
-    """为没有 project_id 的 Team 自动创建对应 Project 并关联."""
+    """Auto-create Projects for Teams without project_id and link them."""
     teams = await repo.list_teams()
     orphan_teams = [t for t in teams if not t.project_id]
     if not orphan_teams:
         return
-    # 检查是否已有项目可以复用
+    # Check if existing projects can be reused
     existing_projects = await repo.list_projects()
     if existing_projects:
-        # 所有孤立Team归入第一个现有Project
+        # Assign all orphan Teams to the first existing Project
         project = existing_projects[0]
         for team in orphan_teams:
             await repo.update_team(team.id, project_id=project.id)
-        logger.info("将 %d 个孤立Team关联到已有Project: %s", len(orphan_teams), project.name)
+        logger.info("Linked %d orphan Teams to existing Project: %s", len(orphan_teams), project.name)
     else:
-        # 创建一个统一Project，用team_id做唯一root_path
+        # Create a unified Project, using team_id as unique root_path
         project = await repo.create_project(
             name="AI Team OS",
             root_path=f"auto-{orphan_teams[0].id}",
@@ -147,15 +147,15 @@ async def _auto_create_projects(repo: StorageRepository) -> None:
         )
         for team in orphan_teams:
             await repo.update_team(team.id, project_id=project.id)
-        logger.info("自动创建Project并关联 %d 个Team", len(orphan_teams))
+        logger.info("Auto-created Project and linked %d Teams", len(orphan_teams))
 
 
 async def _startup_reconciliation(repo: StorageRepository) -> None:
-    """启动对账 — OS重启时将所有BUSY agent设为IDLE并清除session关联.
+    """Startup reconciliation — reset all BUSY agents to IDLE and clear session associations on OS restart.
 
-    原理：OS重启意味着之前的CC session已不存在，
-    所有残留的BUSY状态和session_id都是僵尸，需要清零。
-    另外，将waiting状态且超过1小时无活动的agent设为offline。
+    Rationale: OS restart means previous CC sessions no longer exist,
+    so all lingering BUSY statuses and session_ids are zombies that need to be cleared.
+    Also sets waiting agents with >1 hour of inactivity to offline.
     """
     from datetime import datetime, timedelta
 
@@ -179,7 +179,7 @@ async def _startup_reconciliation(repo: StorageRepository) -> None:
                 await repo.update_agent(agent.id, **updates)
                 reconciled += 1
 
-            # 清理过期agent：waiting且超过1小时无活动 → offline
+            # Clean up stale agents: waiting with >1 hour inactivity -> offline
             effective_status = updates.get("status", agent.status)
             if (
                 effective_status in (AgentStatus.WAITING, AgentStatus.WAITING.value)
@@ -190,21 +190,21 @@ async def _startup_reconciliation(repo: StorageRepository) -> None:
                 stale_count += 1
 
     if reconciled > 0:
-        logger.warning("启动对账: %d 个agent已重置（状态+session清零）", reconciled)
+        logger.warning("Startup reconciliation: %d agents reset (status + session cleared)", reconciled)
     else:
-        logger.info("启动对账: 无需重置")
+        logger.info("Startup reconciliation: no reset needed")
     if stale_count > 0:
-        logger.info("启动对账: %d 个过期waiting agent已设为offline", stale_count)
+        logger.info("Startup reconciliation: %d stale waiting agents set to offline", stale_count)
 
 
 async def init_dependencies() -> None:
-    """初始化所有依赖（lifespan startup时调用）."""
+    """Initialize all dependencies (called during lifespan startup)."""
     global _repository, _memory_store, _event_bus, _manager, _reaper, _watchdog_runner, _hook_translator, _loop_engine  # noqa: PLW0603
 
     _repository = StorageRepository()
     await _repository.init_db()
 
-    # M3.1迁移：为已有表添加新列 + 创建projects表
+    # M3.1 migration: add new columns to existing tables + create projects table
     await _run_migrations()
 
     _memory_store = MemoryStore(repository=_repository)
@@ -215,32 +215,32 @@ async def init_dependencies() -> None:
     _hook_translator = HookTranslator(repo=_repository, event_bus=_event_bus)
     _loop_engine = LoopEngine(repo=_repository)
 
-    # 启动对账：清除残留BUSY状态
+    # Startup reconciliation: clear lingering BUSY states
     await _startup_reconciliation(_repository)
 
-    # 为没有project_id的Team自动创建Project
+    # Auto-create Projects for Teams without project_id
     await _auto_create_projects(_repository)
 
-    # 启动StateReaper后台收割器
+    # Start StateReaper background harvester
     _reaper = StateReaper(repo=_repository, event_bus=_event_bus)
     _reaper.start()
 
-    # 启动WatchdogRunner后台巡检
+    # Start WatchdogRunner background patrol
     _watchdog_checker = WatchdogChecker(repo=_repository)
     _watchdog_runner = WatchdogRunner(checker=_watchdog_checker, event_bus=_event_bus)
     _watchdog_runner.start()
 
 
 async def cleanup_dependencies() -> None:
-    """清理所有依赖（lifespan shutdown时调用）."""
+    """Clean up all dependencies (called during lifespan shutdown)."""
     global _repository, _memory_store, _event_bus, _manager, _reaper, _watchdog_runner, _hook_translator, _loop_engine  # noqa: PLW0603
 
-    # 先停止WatchdogRunner
+    # Stop WatchdogRunner first
     if _watchdog_runner is not None:
         await _watchdog_runner.stop()
         _watchdog_runner = None
 
-    # 停止StateReaper
+    # Stop StateReaper
     if _reaper is not None:
         await _reaper.stop()
         _reaper = None
@@ -255,48 +255,48 @@ async def cleanup_dependencies() -> None:
 
 
 def get_manager() -> TeamManager:
-    """获取 TeamManager 实例，通过 FastAPI Depends() 注入."""
+    """Get TeamManager instance, injected via FastAPI Depends()."""
     if _manager is None:
-        msg = "TeamManager 尚未初始化，请确保应用已启动"
+        msg = "TeamManager not initialized, ensure application has started"
         raise RuntimeError(msg)
     return _manager
 
 
 def get_repository() -> StorageRepository:
-    """获取 StorageRepository 实例."""
+    """Get StorageRepository instance."""
     if _repository is None:
-        msg = "StorageRepository 尚未初始化"
+        msg = "StorageRepository not initialized"
         raise RuntimeError(msg)
     return _repository
 
 
 def get_memory_store() -> MemoryStore:
-    """获取 MemoryStore 实例，通过 FastAPI Depends() 注入."""
+    """Get MemoryStore instance, injected via FastAPI Depends()."""
     if _memory_store is None:
-        msg = "MemoryStore 尚未初始化，请确保应用已启动"
+        msg = "MemoryStore not initialized, ensure application has started"
         raise RuntimeError(msg)
     return _memory_store
 
 
 def get_event_bus() -> EventBus:
-    """获取 EventBus 实例，通过 FastAPI Depends() 注入."""
+    """Get EventBus instance, injected via FastAPI Depends()."""
     if _event_bus is None:
-        msg = "EventBus 尚未初始化，请确保应用已启动"
+        msg = "EventBus not initialized, ensure application has started"
         raise RuntimeError(msg)
     return _event_bus
 
 
 def get_hook_translator() -> HookTranslator:
-    """获取 HookTranslator 单例，通过 FastAPI Depends() 注入."""
+    """Get HookTranslator singleton, injected via FastAPI Depends()."""
     if _hook_translator is None:
-        msg = "HookTranslator 尚未初始化，请确保应用已启动"
+        msg = "HookTranslator not initialized, ensure application has started"
         raise RuntimeError(msg)
     return _hook_translator
 
 
 def get_loop_engine() -> LoopEngine:
-    """获取 LoopEngine 实例，通过 FastAPI Depends() 注入."""
+    """Get LoopEngine instance, injected via FastAPI Depends()."""
     if _loop_engine is None:
-        msg = "LoopEngine 尚未初始化，请确保应用已启动"
+        msg = "LoopEngine not initialized, ensure application has started"
         raise RuntimeError(msg)
     return _loop_engine

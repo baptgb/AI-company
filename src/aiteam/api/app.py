@@ -1,6 +1,6 @@
-"""AI Team OS — FastAPI应用工厂.
+"""AI Team OS — FastAPI application factory.
 
-提供 create_app() 函数，用于创建和配置 FastAPI 实例。
+Provides create_app() function for creating and configuring FastAPI instances.
 """
 
 from __future__ import annotations
@@ -21,16 +21,16 @@ from aiteam.api.routes import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """应用生命周期管理."""
-    # 启动：初始化依赖
+    """Application lifecycle management."""
+    # Startup: initialize dependencies
     await init_dependencies()
     yield
-    # 关闭：清理资源
+    # Shutdown: clean up resources
     await cleanup_dependencies()
 
 
 def create_app() -> FastAPI:
-    """创建FastAPI应用实例."""
+    """Create a FastAPI application instance."""
     app = FastAPI(
         title="AI Team OS",
         description="通用可复用的AI Agent团队操作系统 API",
@@ -38,7 +38,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS中间件
+    # CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -50,23 +50,23 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # 注册路由
+    # Register routes
     app.include_router(api_router)
 
-    # 注册统一错误处理
+    # Register unified error handlers
     register_error_handlers(app)
 
-    # 挂载Dashboard静态文件（必须在API路由之后，确保/api/*不被拦截）
+    # Mount Dashboard static files (must be after API routes to avoid intercepting /api/*)
     _project_root = Path(__file__).resolve().parent.parent.parent.parent
     _dist_dir = _project_root / "dashboard" / "dist"
 
     if _dist_dir.is_dir():
-        # /assets 静态资源直接由StaticFiles处理
+        # /assets static resources served directly by StaticFiles
         _assets_dir = _dist_dir / "assets"
         if _assets_dir.is_dir():
             app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="dashboard-assets")
 
-        # SPA catch-all: 非API、非assets的路径全部返回index.html
+        # SPA catch-all: all non-API, non-assets paths return index.html
         @app.get("/{path:path}")
         async def spa_fallback(path: str) -> FileResponse:
             if path.startswith("api/") or path.startswith("assets/"):

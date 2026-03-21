@@ -1,6 +1,6 @@
-"""AI Team OS — WebSocket消息协议.
+"""AI Team OS — WebSocket message protocol.
 
-定义服务端与客户端之间的消息格式。
+Defines message formats between server and client.
 """
 
 from __future__ import annotations
@@ -11,12 +11,12 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 # ============================================================
-# 服务端 → 客户端
+# Server -> Client
 # ============================================================
 
 
 class WSEvent(BaseModel):
-    """服务端推送的事件消息."""
+    """Server-pushed event message."""
 
     type: str = "event"
     channel: str
@@ -26,13 +26,13 @@ class WSEvent(BaseModel):
 
 
 class WSPong(BaseModel):
-    """心跳响应."""
+    """Heartbeat response."""
 
     type: str = "pong"
 
 
 class WSAck(BaseModel):
-    """操作确认."""
+    """Operation acknowledgment."""
 
     type: str = "ack"
     action: str
@@ -40,32 +40,32 @@ class WSAck(BaseModel):
 
 
 class WSError(BaseModel):
-    """错误消息."""
+    """Error message."""
 
     type: str = "error"
     message: str
 
 
 # ============================================================
-# 客户端 → 服务端
+# Client -> Server
 # ============================================================
 
 
 class WSSubscribe(BaseModel):
-    """订阅频道."""
+    """Subscribe to a channel."""
 
     type: str = "subscribe"
     channel: str
 
 
 class WSUnsubscribe(BaseModel):
-    """取消订阅频道."""
+    """Unsubscribe from a channel."""
 
     type: str = "unsubscribe"
     channel: str
 
 
 class WSPing(BaseModel):
-    """心跳请求."""
+    """Heartbeat request."""
 
     type: str = "ping"

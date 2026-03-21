@@ -1,4 +1,4 @@
-"""AI Team OS — API路由汇总."""
+"""AI Team OS — API route aggregation."""
 
 from fastapi import APIRouter
 

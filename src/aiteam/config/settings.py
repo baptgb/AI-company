@@ -1,6 +1,6 @@
-"""AI Team OS — 配置管理.
+"""AI Team OS — Configuration management.
 
-负责加载和验证 aiteam.yaml 配置文件。
+Responsible for loading and validating aiteam.yaml config files.
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ from pydantic import BaseModel, Field, field_validator
 from aiteam.types import OrchestrationMode
 
 # ============================================================
-# 配置模型
+# Configuration models
 # ============================================================
 
 
 class ProjectInfo(BaseModel):
-    """项目基本信息."""
+    """Project basic info."""
 
     name: str = ""
     description: str = ""
@@ -27,7 +27,7 @@ class ProjectInfo(BaseModel):
 
 
 class InfrastructureConfig(BaseModel):
-    """基础设施配置."""
+    """Infrastructure configuration."""
 
     storage_backend: Literal["sqlite", "postgresql"] = "sqlite"
     memory_backend: Literal["file", "mem0"] = "file"
@@ -38,7 +38,7 @@ class InfrastructureConfig(BaseModel):
     db_url: str = ""
 
     def get_db_url(self, project_dir: Path) -> str:
-        """获取数据库URL，默认使用项目目录下的SQLite."""
+        """Get database URL, defaults to SQLite in project directory."""
         if self.db_url:
             return self.db_url
         if self.storage_backend == "postgresql":
@@ -47,14 +47,14 @@ class InfrastructureConfig(BaseModel):
 
 
 class DefaultsConfig(BaseModel):
-    """默认配置."""
+    """Default configuration."""
 
     model: str = "claude-opus-4-6"
     max_context_ratio: float = Field(default=0.8, ge=0.1, le=1.0)
 
 
 class AgentConfig(BaseModel):
-    """Agent配置."""
+    """Agent configuration."""
 
     name: str
     role: str
@@ -63,7 +63,7 @@ class AgentConfig(BaseModel):
 
 
 class TeamMemberConfig(BaseModel):
-    """团队配置."""
+    """Team configuration."""
 
     name: str = ""
     mode: str = "coordinate"
@@ -75,13 +75,13 @@ class TeamMemberConfig(BaseModel):
     def validate_mode(cls, v: str) -> str:
         valid = [m.value for m in OrchestrationMode]
         if v not in valid:
-            msg = f"无效的编排模式 '{v}'，支持的模式: {', '.join(valid)}"
+            msg = f"Invalid orchestration mode '{v}', supported modes: {', '.join(valid)}"
             raise ValueError(msg)
         return v
 
 
 class ProjectConfig(BaseModel):
-    """aiteam.yaml 的完整配置模型."""
+    """Complete configuration model for aiteam.yaml."""
 
     project: ProjectInfo = Field(default_factory=ProjectInfo)
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
@@ -90,27 +90,27 @@ class ProjectConfig(BaseModel):
 
 
 # ============================================================
-# 配置加载
+# Configuration loading
 # ============================================================
 
 CONFIG_FILENAME = "aiteam.yaml"
 AITEAM_DIR = ".aiteam"
 
 # ============================================================
-# StateReaper 超时配置
+# StateReaper timeout configuration
 # ============================================================
 
-REAPER_CHECK_INTERVAL = 60  # 收割器轮询间隔（秒）
-HOOK_SOURCE_TIMEOUT = 300  # hook-source agent心跳超时（5分钟无活动→设为offline）
-API_SOURCE_TIMEOUT_WITH_FILE = 1200  # api-source有团队文件时超时（20分钟）
-API_SOURCE_TIMEOUT_NO_FILE = 600  # api-source无团队文件时超时（10分钟）
-MEETING_EXPIRY_HOURS = 2  # 会议无新消息超过此时间自动结束（小时）
-WATCHDOG_CHECK_INTERVAL = 60  # Watchdog巡检间隔（秒）
-CLAUDE_HOME = "~/.claude"  # Claude Code 主目录
+REAPER_CHECK_INTERVAL = 60  # Reaper polling interval (seconds)
+HOOK_SOURCE_TIMEOUT = 300  # hook-source agent heartbeat timeout (5min inactive -> offline)
+API_SOURCE_TIMEOUT_WITH_FILE = 1200  # api-source timeout with team file (20 minutes)
+API_SOURCE_TIMEOUT_NO_FILE = 600  # api-source timeout without team file (10 minutes)
+MEETING_EXPIRY_HOURS = 2  # Meeting auto-concludes after this many hours without new messages
+WATCHDOG_CHECK_INTERVAL = 60  # Watchdog patrol interval (seconds)
+CLAUDE_HOME = "~/.claude"  # Claude Code home directory
 
 
 def find_config_file(start_dir: Path | None = None) -> Path | None:
-    """从当前目录向上查找 aiteam.yaml."""
+    """Find aiteam.yaml by searching upward from current directory."""
     current = start_dir or Path.cwd()
     while True:
         config_path = current / CONFIG_FILENAME
@@ -123,7 +123,7 @@ def find_config_file(start_dir: Path | None = None) -> Path | None:
 
 
 def load_config(config_path: Path | None = None) -> ProjectConfig:
-    """加载并验证配置文件."""
+    """Load and validate configuration file."""
     if config_path is None:
         config_path = find_config_file()
     if config_path is None or not config_path.exists():
@@ -136,7 +136,7 @@ def load_config(config_path: Path | None = None) -> ProjectConfig:
 
 
 def generate_default_config() -> str:
-    """生成默认的 aiteam.yaml 内容."""
+    """Generate default aiteam.yaml content."""
     return """\
 # AI Team OS 项目配置
 project:

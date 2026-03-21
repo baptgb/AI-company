@@ -1,1 +1,1 @@
-"""AI Team OS — WebSocket模块."""
+"""AI Team OS — WebSocket module."""
