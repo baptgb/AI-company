@@ -207,20 +207,18 @@ UserPromptSubmit → context_monitor.py            — Monitor context usage rat
 - Claude Code (MCP support required)
 - Node.js >= 20 (Dashboard frontend, optional)
 
-### Four Steps to Launch
+### Three Steps to Launch
 
 ```bash
 # Step 1: Clone the repository
 git clone https://github.com/CronusL-1141/AI-company.git
-cd AI-company/ai-team-os
+cd AI-company
 
-# Step 2: Run the installer (auto-configures MCP + Hooks + Agent templates)
+# Step 2: Run the installer (auto-configures MCP + Hooks + Agent templates + API)
 python install.py
 
-# Step 3: Start the API server (keep this terminal open)
-python -m uvicorn aiteam.api.app:create_app --factory --host 0.0.0.0 --port 8000
-
-# Step 4: Restart Claude Code — the OS activates automatically
+# Step 3: Restart Claude Code — everything activates automatically
+# API server starts automatically when MCP loads. No manual startup needed.
 # Verify: run /mcp in CC and check that ai-team-os tools are mounted
 ```
 
