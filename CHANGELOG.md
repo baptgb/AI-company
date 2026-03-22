@@ -1,39 +1,77 @@
 # Changelog
 
 All notable changes to AI Team OS will be documented in this file.
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
+## [0.5.0] — 2026-03-22
 
 ### Added
-
-- 6 new MCP tools: `project_list`, `meeting_list`, `team_close`, `task_list_project`, `agent_activity_query`, `meeting_update` (total: 55)
-- Council meeting template (3-round multi-perspective expert review)
-- Meeting auto-select: keyword matching across 8 templates
-- `find_skill` MCP tool with 3-layer progressive loading (quick recommend / category browse / full detail)
-- `task_update` MCP tool + `PUT /api/tasks/{id}` (partial update with auto timestamps)
-- `GET /api/health` endpoint
-- `auto_start` parameter for `task_create`
-- 109 workflow_reminder unit tests + 34 find_skill tests + 27 API E2E tests + 31 dashboard E2E tests (total: 467+)
-- Local agent blocking: all non-readonly agents must declare `team_name`/`name`
-
-### Fixed
-
-- BUG-001: S1 safety regex now catches uppercase `-R` flag (e.g. `rm -RF`)
-- S1 heredoc false positive: strip heredoc blocks before scanning for destructive patterns
-- B0.4: detect `name` param for implicit CC team context
-- Rule 7: initialize taskwall timer on first call to prevent false stall detection
-- Meeting cascade close when team is closed via `team_close`
-- Meeting expiry reduced from 2h to 45min to prevent stale meeting accumulation
-- B0.9: infrastructure MCP tools excluded from delegation counter
+- Cross-project messaging system (2 MCP tools + 4 API endpoints + global DB)
+- Auto-update mechanism (scripts/update.py + install.py --update)
+- SessionStart 24h-cooldown update checker
+- Self-contained install: hooks copied to ~/.claude/hooks/ai-team-os/
+- Global MCP registration in ~/.claude/settings.json
 
 ### Changed
+- Install reduced to 3 steps (API auto-starts with MCP, no manual startup)
 
-- Session bootstrap Rule 4: updated template usage guidance
-- Workflow reminder Rule 2: task wall check + template reminder + memo requirement
-- Default team config: 4 roles (qa-engineer, bug-fixer, tech-writer, code-reviewer)
-- Ecosystem guide restructured with Layer markers
-- Agent template library expanded from 22 to 26 templates with recommendation engine
-- Meeting template library expanded from 7 to 8 templates
+## [0.4.0] — 2026-03-21
+
+### Added
+- Per-project database isolation (Phase 1-4)
+- EnginePool with LRU cache for multi-DB management
+- ProjectContextMiddleware (X-Project-Dir header routing)
+- Migration script: split global DB by project_id
+- StateReaper + Watchdog multi-DB adaptation
+- Dashboard project switcher
+- install.py: full onboarding (hooks + agents + MCP + verification)
+- GET /api/health endpoint
+
+### Fixed
+- Windows UTF-8 encoding in all hook scripts (gbk to utf-8)
+- Team templates reference actual agent template names
+
+## [0.3.0] — 2026-03-21
+
+### Added
+- Workflow enforcement: Rule 2 task wall check + template reminder
+- Local agent blocking (B0.4): all non-readonly agents must have team_name
+- Council meeting template (3-round multi-perspective expert review)
+- Meeting auto-select: keyword matching across 8 templates
+- Meeting cascade close on team shutdown
+- find_skill MCP tool with 3-layer progressive loading
+- task_update MCP tool + PUT /api/tasks/{id}
+- 6 new MCP tools (total: 55)
+- 467+ tests
+
+### Fixed
+- S1 safety regex catches uppercase -R flag
+- S1 heredoc false positive
+- Rule 7 taskwall timer initialization
+- Meeting expiry 2h to 45min
+- B0.9 infrastructure tools exempt from delegation counter
+
+## [0.2.0] — 2026-03-20
+
+### Added
+- LoopEngine with AWARE cycle
+- Task wall with score ranking + kanban
+- Scheduler system (periodic tasks)
+- React Dashboard (6 pages)
+- Meeting system with 7 templates
+- 26 agent templates across 7 categories
+- Failure alchemy (antibody + vaccine + catalyst)
+- What-if analysis
+- i18n support (zh/en)
+- R&D monitoring system (10 sources)
+
+## [0.1.0] — 2026-03-12
+
+### Added
+- MCP server with FastAPI backend
+- CC Hooks integration (7 lifecycle events)
+- Team/agent/task/project management
+- SQLite storage with async repository
+- Session bootstrap with behavioral rule injection
+- Event bus + decision logging
+- Memory search
