@@ -6,6 +6,7 @@ from aiteam.api.routes.activities import router as activities_router
 from aiteam.api.routes.agent_templates import router as agent_templates_router
 from aiteam.api.routes.agents import router as agents_router
 from aiteam.api.routes.analytics import router as analytics_router
+from aiteam.api.routes.cross_messages import router as cross_messages_router
 from aiteam.api.routes.decisions import router as decisions_router
 from aiteam.api.routes.events import router as events_router
 from aiteam.api.routes.health import router as health_router
@@ -49,3 +50,4 @@ api_router.include_router(agent_templates_router)
 api_router.include_router(templates_router)
 api_router.include_router(scheduler_router)
 api_router.include_router(ws_router)
+api_router.include_router(cross_messages_router)

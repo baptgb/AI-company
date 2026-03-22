@@ -16,6 +16,8 @@ from aiteam.types import (
     Agent,
     AgentActivity,
     AgentStatus,
+    CrossMessage,
+    CrossMessageType,
     Event,
     EventType,
     Meeting,
@@ -581,4 +583,52 @@ class ScheduledTaskModel(Base):
             last_run_at=task.last_run_at,
             next_run_at=task.next_run_at,
             created_at=task.created_at,
+        )
+
+
+class CrossMessageModel(Base):
+    """Cross-project messages table — stored in the global default DB."""
+
+    __tablename__ = "cross_messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    from_project_id: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
+    from_project_dir: Mapped[str] = mapped_column(String(500), nullable=False)
+    to_project_id: Mapped[str | None] = mapped_column(String(12), nullable=True, index=True)
+    sender_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    message_type: Mapped[str] = mapped_column(String(20), nullable=False, default="notification")
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    def to_pydantic(self) -> CrossMessage:
+        """Convert to Pydantic model."""
+        return CrossMessage(
+            id=self.id,
+            from_project_id=self.from_project_id,
+            from_project_dir=self.from_project_dir,
+            to_project_id=self.to_project_id,
+            sender_name=self.sender_name,
+            content=self.content,
+            message_type=CrossMessageType(self.message_type),
+            metadata=self.metadata_json or {},
+            created_at=self.created_at,
+            read_at=self.read_at,
+        )
+
+    @staticmethod
+    def from_pydantic(msg: CrossMessage) -> CrossMessageModel:
+        """Create an ORM instance from a Pydantic model."""
+        return CrossMessageModel(
+            id=msg.id,
+            from_project_id=msg.from_project_id,
+            from_project_dir=msg.from_project_dir,
+            to_project_id=msg.to_project_id,
+            sender_name=msg.sender_name,
+            content=msg.content,
+            message_type=msg.message_type.value,
+            metadata_json=msg.metadata,
+            created_at=msg.created_at,
+            read_at=msg.read_at,
         )

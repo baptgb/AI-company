@@ -2030,6 +2030,73 @@ def meeting_update(
 
 
 # ============================================================
+# Tool: cross_project_send
+# ============================================================
+
+
+@mcp.tool()
+def cross_project_send(
+    content: str,
+    to_project_id: str = "",
+    message_type: str = "notification",
+    sender_name: str = "system",
+) -> dict[str, Any]:
+    """Send a message to another project (or broadcast to all).
+
+    Messages are stored in the shared global DB so any project can read them.
+    Requires PROJECT_DIR env var (set automatically by Claude Code via CLAUDE_PROJECT_DIR).
+
+    Args:
+        content: Message body text.
+        to_project_id: Recipient's 12-char project ID. Leave empty to broadcast to all projects.
+        message_type: One of "notification" / "request" / "response" / "broadcast".
+        sender_name: Sender name shown in the recipient's inbox (default "system").
+
+    Returns:
+        Created cross-project message info including id, from_project_id, created_at.
+    """
+    payload: dict[str, Any] = {
+        "content": content,
+        "sender_name": sender_name,
+        "message_type": message_type,
+        "metadata": {},
+    }
+    if to_project_id:
+        payload["to_project_id"] = to_project_id
+    return _api_call("POST", "/api/cross-messages", payload)
+
+
+# ============================================================
+# Tool: cross_project_inbox
+# ============================================================
+
+
+@mcp.tool()
+def cross_project_inbox(
+    unread_only: bool = True,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Read the cross-project message inbox for the current project.
+
+    Returns direct messages sent to this project plus any broadcasts.
+    Requires PROJECT_DIR env var (set automatically by Claude Code via CLAUDE_PROJECT_DIR).
+
+    Args:
+        unread_only: If True (default), only return unread messages.
+        limit: Maximum number of messages to return (default 20).
+
+    Returns:
+        Inbox message list sorted newest-first, plus unread_count.
+    """
+    params = urllib.parse.urlencode({"unread_only": str(unread_only).lower(), "limit": limit})
+    inbox = _api_call("GET", f"/api/cross-messages?{params}")
+    count = _api_call("GET", "/api/cross-messages/count")
+    if isinstance(inbox, dict) and isinstance(count, dict):
+        inbox["unread_count"] = count.get("data", 0)
+    return inbox
+
+
+# ============================================================
 # Entry point
 # ============================================================
 

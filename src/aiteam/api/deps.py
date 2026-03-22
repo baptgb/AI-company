@@ -11,12 +11,12 @@ from sqlalchemy import inspect, text
 
 from aiteam.api.event_bus import EventBus
 from aiteam.api.hook_translator import HookTranslator
+from aiteam.api.project_context import current_db_url
 from aiteam.api.state_reaper import StateReaper
 from aiteam.loop.engine import LoopEngine
 from aiteam.loop.watchdog import WatchdogChecker, WatchdogRunner
 from aiteam.memory.store import MemoryStore
 from aiteam.orchestrator.team_manager import TeamManager
-from aiteam.api.project_context import current_db_url
 from aiteam.storage.connection import close_db, get_engine
 from aiteam.storage.repository import StorageRepository
 from aiteam.types import AgentStatus
@@ -298,6 +298,18 @@ def get_repository() -> StorageRepository:
         return repo
 
     # Fallback to default repository
+    if _repository is None:
+        msg = "StorageRepository not initialized"
+        raise RuntimeError(msg)
+    return _repository
+
+
+def get_global_repository() -> StorageRepository:
+    """Get the default global StorageRepository — always the default DB regardless of project context.
+
+    Used by cross-project message endpoints which must read/write the shared global DB,
+    not per-project databases.
+    """
     if _repository is None:
         msg = "StorageRepository not initialized"
         raise RuntimeError(msg)

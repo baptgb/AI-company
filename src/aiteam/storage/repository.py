@@ -18,6 +18,7 @@ from aiteam.storage.connection import init_db as _init_db
 from aiteam.storage.models import (
     AgentActivityModel,
     AgentModel,
+    CrossMessageModel,
     EventModel,
     MeetingMessageModel,
     MeetingModel,
@@ -32,6 +33,8 @@ from aiteam.types import (
     Agent,
     AgentActivity,
     AgentStatus,
+    CrossMessage,
+    CrossMessageType,
     Event,
     EventType,
     Meeting,
@@ -1336,6 +1339,132 @@ class StorageRepository:
                     }
                 )
             return output
+
+    # ================================================================
+    # Cross-project messages — always in the global default DB
+    # ================================================================
+
+    async def create_cross_message(
+        self,
+        from_project_id: str,
+        from_project_dir: str,
+        to_project_id: str | None,
+        sender_name: str,
+        content: str,
+        message_type: str = "notification",
+        metadata: dict | None = None,
+    ) -> CrossMessage:
+        """Create a cross-project message.
+
+        Args:
+            from_project_id: Sender's 12-char project ID (from compute_project_id).
+            from_project_dir: Sender's project directory path.
+            to_project_id: Recipient's 12-char project ID, or None for broadcast.
+            sender_name: Name of the sending agent / component.
+            content: Message body.
+            message_type: One of notification / request / response / broadcast.
+            metadata: Optional extra data dict.
+
+        Returns:
+            Created CrossMessage Pydantic model.
+        """
+        msg = CrossMessage(
+            from_project_id=from_project_id,
+            from_project_dir=from_project_dir,
+            to_project_id=to_project_id,
+            sender_name=sender_name,
+            content=content,
+            message_type=CrossMessageType(message_type),
+            metadata=metadata or {},
+        )
+        orm = CrossMessageModel.from_pydantic(msg)
+        async with get_session(self._db_url) as session:
+            session.add(orm)
+        return msg
+
+    async def list_cross_messages(
+        self,
+        project_id: str,
+        unread_only: bool = False,
+        limit: int = 50,
+    ) -> list[CrossMessage]:
+        """List inbox messages for a project.
+
+        Returns messages where to_project_id == project_id (direct)
+        OR to_project_id IS NULL (broadcast), sorted newest-first.
+
+        Args:
+            project_id: Recipient project's 12-char ID.
+            unread_only: If True, exclude messages that have been read.
+            limit: Maximum number of results to return.
+
+        Returns:
+            List of CrossMessage sorted by created_at descending.
+        """
+        from sqlalchemy import or_
+
+        async with get_session(self._db_url) as session:
+            stmt = (
+                select(CrossMessageModel)
+                .where(
+                    or_(
+                        CrossMessageModel.to_project_id == project_id,
+                        CrossMessageModel.to_project_id.is_(None),
+                    )
+                )
+                .order_by(CrossMessageModel.created_at.desc())
+                .limit(limit)
+            )
+            if unread_only:
+                stmt = stmt.where(CrossMessageModel.read_at.is_(None))
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [r.to_pydantic() for r in rows]
+
+    async def mark_cross_message_read(self, message_id: str) -> CrossMessage | None:
+        """Mark a cross-project message as read.
+
+        Args:
+            message_id: Message UUID.
+
+        Returns:
+            Updated CrossMessage, or None if not found.
+        """
+        async with get_session(self._db_url) as session:
+            result = await session.execute(
+                select(CrossMessageModel).where(CrossMessageModel.id == message_id)
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                return None
+            row.read_at = datetime.now()
+            return row.to_pydantic()
+
+    async def count_unread_cross_messages(self, project_id: str) -> int:
+        """Count unread messages in a project's inbox (direct + broadcast).
+
+        Args:
+            project_id: Recipient project's 12-char ID.
+
+        Returns:
+            Number of unread messages.
+        """
+        from sqlalchemy import or_
+
+        async with get_session(self._db_url) as session:
+            stmt = (
+                select(func.count())
+                .select_from(CrossMessageModel)
+                .where(
+                    or_(
+                        CrossMessageModel.to_project_id == project_id,
+                        CrossMessageModel.to_project_id.is_(None),
+                    ),
+                    CrossMessageModel.read_at.is_(None),
+                )
+            )
+            result = await session.execute(stmt)
+            return result.scalar_one() or 0
 
     # ================================================================
     # Scheduled Tasks

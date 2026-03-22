@@ -361,6 +361,30 @@ class AgentActivity(BaseModel):
     error: str | None = None  # Error message
 
 
+class CrossMessageType(enum.StrEnum):
+    """Cross-project message type."""
+
+    NOTIFICATION = "notification"
+    REQUEST = "request"
+    RESPONSE = "response"
+    BROADCAST = "broadcast"
+
+
+class CrossMessage(BaseModel):
+    """Cross-project message — shared across all projects in the global DB."""
+
+    id: str = Field(default_factory=_new_id)
+    from_project_id: str
+    from_project_dir: str
+    to_project_id: str | None = None  # None means broadcast to all projects
+    sender_name: str
+    content: str
+    message_type: CrossMessageType = CrossMessageType.NOTIFICATION
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.now)
+    read_at: datetime | None = None
+
+
 class ScheduledTask(BaseModel):
     """Scheduled task — periodic automation trigger."""
 
