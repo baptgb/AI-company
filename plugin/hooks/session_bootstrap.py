@@ -321,8 +321,14 @@ def main() -> None:
     except Exception:
         session_info = {}
 
-    # Check if API is reachable
-    health = _api_get("/api/teams")
+    # Check if API is reachable (retry up to 3 times — MCP may still be starting it)
+    import time
+    health = None
+    for attempt in range(3):
+        health = _api_get("/api/teams")
+        if health is not None:
+            break
+        time.sleep(2)
 
     if health is not None:
         # API reachable -> output briefing to stdout (injected into Claude context)
