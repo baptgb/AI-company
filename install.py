@@ -191,35 +191,12 @@ def copy_agent_templates(project_root: Path, overwrite: bool = False) -> None:
 
 
 def register_global_mcp(project_root: Path) -> None:
-    """Merge ai-team-os MCP server into ~/.claude/settings.json mcpServers.
+    """Register ai-team-os MCP server globally + project-level fallback.
 
-    This registers the MCP server globally so it is available in ALL projects,
-    not just when Claude Code is opened from the project directory.
-
-    Falls back to generating a project-level .mcp.json if settings.json cannot
-    be written (e.g. permission error).
+    CC loads global MCP from ~/.claude.json (NOT ~/.claude/settings.json).
+    We also generate project-level .mcp.json as a reliable fallback.
     """
-    settings_path = Path.home() / ".claude" / "settings.json"
-
-    # Load existing settings
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    if settings_path.exists():
-        try:
-            settings = json.loads(settings_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            settings = {}
-    else:
-        settings = {}
-
-    mcp_servers: dict = settings.setdefault("mcpServers", {})
-
-    if "ai-team-os" in mcp_servers:
-        print("[OK] Global MCP server 'ai-team-os' already registered in settings.json, skipped")
-        return
-
-    # Register without cwd — works after `pip install` because `aiteam` is on PATH/PYTHONPATH.
-    # Use sys.executable so the same interpreter that ran install.py is used.
-    mcp_servers["ai-team-os"] = {
+    mcp_entry = {
         "command": sys.executable,
         "args": ["-m", "aiteam.mcp.server"],
         "env": {
@@ -227,15 +204,51 @@ def register_global_mcp(project_root: Path) -> None:
         },
     }
 
+    # Method 1: Try CLI command (most reliable)
     try:
-        settings_path.write_text(
-            json.dumps(settings, indent=2, ensure_ascii=False),
-            encoding="utf-8",
+        import json as _json
+        result = subprocess.run(
+            ["claude", "mcp", "add-json", "--scope", "global", "ai-team-os",
+             _json.dumps(mcp_entry)],
+            capture_output=True, text=True, timeout=15,
         )
-        print("[OK] Registered global MCP server 'ai-team-os' into ~/.claude/settings.json")
-    except OSError as e:
-        print(f"[WARN] Could not write to settings.json: {e}")
-        print("[WARN] Falling back to project-level .mcp.json")
+        if result.returncode == 0:
+            print("[OK] Registered global MCP via 'claude mcp add-json --scope global'")
+        else:
+            raise RuntimeError(result.stderr)
+    except Exception:
+        # Method 2: Direct write to ~/.claude.json (runtime state file)
+        claude_json_path = Path.home() / ".claude.json"
+        try:
+            if claude_json_path.exists():
+                claude_json = json.loads(claude_json_path.read_text(encoding="utf-8"))
+            else:
+                claude_json = {}
+
+            mcp_servers: dict = claude_json.setdefault("mcpServers", {})
+            if "ai-team-os" not in mcp_servers:
+                mcp_servers["ai-team-os"] = mcp_entry
+                claude_json_path.write_text(
+                    json.dumps(claude_json, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                print("[OK] Registered global MCP in ~/.claude.json")
+            else:
+                print("[OK] Global MCP 'ai-team-os' already in ~/.claude.json")
+        except Exception as e:
+            print(f"[WARN] Could not register global MCP: {e}")
+
+    # Only generate project-level .mcp.json if global registration failed
+    claude_json_path = Path.home() / ".claude.json"
+    global_ok = False
+    if claude_json_path.exists():
+        try:
+            cj = json.loads(claude_json_path.read_text(encoding="utf-8"))
+            global_ok = "ai-team-os" in cj.get("mcpServers", {})
+        except Exception:
+            pass
+    if not global_ok:
+        print("[WARN] Global MCP registration failed, falling back to project-level .mcp.json")
         _write_project_mcp_json(project_root)
 
 
