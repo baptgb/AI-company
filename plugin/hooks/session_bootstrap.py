@@ -256,7 +256,7 @@ def _build_briefing() -> str:
     lines.append("1. Leader专注统筹——除极快小改动(<2min)外，所有实施工作分配给团队成员执行")
     lines.append("2. 统筹并行: 同时推进多方向，动态添加/Kill成员，QA问题分派后继续其他任务")
     lines.append("3. 添加成员必须用 Agent(team_name=...) 创建CC团队成员，不用local agent")
-    lines.append("4. 创建Agent时优先使用模板: agent_template_recommend(任务描述)查推荐 → Agent(subagent_type=模板名, team_name=..., name=...)。无匹配模板时才用general-purpose")
+    lines.append("4. 创建Agent时优先使用OS模板: agent_template_recommend(任务描述)查推荐 → Agent(subagent_type=模板名, team_name=..., name=...)。禁止Explore/Plan+team_name组合（它们不支持SendMessage团队通讯）。无匹配模板时才用general-purpose")
     lines.append("5. TeamCreate后立即创建常驻成员(QA+bug-fixer)，然后才创建临时成员")
     lines.append("6. 团队组成: 常驻QA+Bug-fixer不Kill；临时开发/研究完成后Kill；团队不关闭")
     lines.append("7. 绝对不空等——派出Agent后立刻从任务墙领取下一个任务并行推进。绝不出现'等X返回'然后什么都不做的情况。最多3方向并行。任务墙空了就组织会议讨论下一步")

@@ -65,9 +65,21 @@ def _check_agent_team_name(event_data: dict) -> str | None:
     tool_input_dict = event_data.get("tool_input", {})
     tool_input = json.dumps(tool_input_dict, ensure_ascii=False).lower()
 
-    # Read-only subagent types are exempt (no file modifications)
-    readonly_types = ["explore", "plan", "code-reviewer", "security-reviewer", "python-reviewer"]
-    for rt in readonly_types:
+    # Read-only CC built-in types: exempt from team_name but warn if used with team_name
+    readonly_builtins = ["explore", "plan"]
+    subagent_type = tool_input_dict.get("subagent_type", "").lower()
+    has_team = bool(tool_input_dict.get("team_name"))
+    if subagent_type in readonly_builtins:
+        if has_team:
+            return (
+                "[OS提醒] Explore/Plan 是 CC 内置只读类型，不支持 SendMessage 团队通讯。"
+                "请改用 OS 模板（如 software-architect、testing-qa-engineer）+ team_name 进行团队协作。"
+            )
+        return None  # Solo use is fine
+
+    # OS agent templates with review-only capability
+    readonly_templates = ["code-reviewer", "security-reviewer", "python-reviewer"]
+    for rt in readonly_templates:
         if rt in tool_input:
             return None
 
