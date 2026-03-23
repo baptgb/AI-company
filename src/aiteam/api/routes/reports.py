@@ -72,7 +72,9 @@ async def list_reports() -> list[ReportMeta]:
         return []
 
     results: list[ReportMeta] = []
-    for path in reports_dir.glob("*.md"):
+    for path in reports_dir.iterdir():
+        if not path.is_file():
+            continue
         meta = _parse_filename(path.name)
         if meta is None:
             # Include files with non-standard names using fallback values
@@ -107,11 +109,17 @@ async def get_report(filename: str) -> ReportDetail:
     if meta is None:
         meta = {"author": "unknown", "topic": path.stem, "date": ""}
 
-    # Try UTF-8 first, fall back to system encoding (e.g. GBK on Windows)
-    try:
-        content = path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        content = path.read_bytes().decode("utf-8", errors="replace")
+    # Try multiple encodings to handle files from different sources
+    raw = path.read_bytes()
+    content = None
+    for enc in ("utf-8", "gbk", "gb2312", "latin-1"):
+        try:
+            content = raw.decode(enc)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if content is None:
+        content = raw.decode("utf-8", errors="replace")
     return ReportDetail(
         filename=filename,
         author=meta["author"],
