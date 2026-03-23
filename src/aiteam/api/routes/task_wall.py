@@ -63,6 +63,10 @@ async def get_project_task_wall(
     scores: list[float] = []
 
     for task in all_project_tasks:
+        # Filter out pipeline subtasks — they should not appear as top-level wall cards.
+        if task.parent_id is not None:
+            continue
+
         s = task.status if isinstance(task.status, str) else task.status.value
         by_status[s] = by_status.get(s, 0) + 1
 
@@ -85,6 +89,23 @@ async def get_project_task_wall(
         score = calculate_task_score(task, now)
         item["score"] = round(score, 1)
         scores.append(score)
+
+        # Attach pipeline progress summary if the task has a pipeline config.
+        pipeline_cfg = task.config.get("pipeline")
+        if pipeline_cfg:
+            stages = pipeline_cfg.get("stages", [])
+            active = [s for s in stages if s.get("status") != "skipped"]
+            done = [s for s in active if s.get("status") in ("completed", "skipped")]
+            total_active = len(active)
+            done_count = len(done)
+            current_idx = pipeline_cfg.get("current_stage_index", 0)
+            current_stage_name = None
+            if current_idx < len(stages):
+                current_stage_name = stages[current_idx].get("name")
+            pct = round(done_count / total_active * 100) if total_active > 0 else 0
+            item["pipeline_progress"] = f"{done_count}/{total_active}"
+            item["pipeline_current_stage"] = current_stage_name
+            item["pipeline_pct"] = pct
 
         if h in wall:
             wall[h].append(item)

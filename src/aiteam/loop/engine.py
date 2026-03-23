@@ -384,6 +384,11 @@ class LoopEngine:
         completed_tasks: list[dict] = []
 
         for task in all_tasks:
+            # Filter out pipeline subtasks — they have a parent_id and should not
+            # appear as top-level cards on the task wall.
+            if task.parent_id is not None:
+                continue
+
             if task.status == TaskStatus.COMPLETED:
                 completed_tasks.append(task.model_dump(mode="json"))
                 continue
@@ -399,6 +404,23 @@ class LoopEngine:
             score = calculate_task_score(task, now)
             item = task.model_dump(mode="json")
             item["score"] = round(score, 1)
+
+            # Attach pipeline progress summary if the task has a pipeline config.
+            pipeline_cfg = task.config.get("pipeline")
+            if pipeline_cfg:
+                stages = pipeline_cfg.get("stages", [])
+                active = [s for s in stages if s.get("status") != "skipped"]
+                done = [s for s in active if s.get("status") in ("completed", "skipped")]
+                total_active = len(active)
+                done_count = len(done)
+                current_idx = pipeline_cfg.get("current_stage_index", 0)
+                current_stage_name = None
+                if current_idx < len(stages):
+                    current_stage_name = stages[current_idx].get("name")
+                pct = round(done_count / total_active * 100) if total_active > 0 else 0
+                item["pipeline_progress"] = f"{done_count}/{total_active}"
+                item["pipeline_current_stage"] = current_stage_name
+                item["pipeline_pct"] = pct
 
             if h in wall:
                 wall[h].append(item)

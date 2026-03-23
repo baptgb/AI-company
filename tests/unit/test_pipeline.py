@@ -474,3 +474,86 @@ def test_pipeline_advance_updates_subtask_status(repo_and_loop):
     # Check subtask is completed
     sub0 = _run(repo.get_task(sub0_id))
     assert sub0.status.value == "completed"
+
+
+def test_pipeline_completion_auto_marks_parent_completed(repo_and_loop):
+    """When all pipeline stages complete, parent task is auto-marked completed."""
+    repo = repo_and_loop
+    team = _run(repo.create_team("auto-complete-team", "coordinate"))
+    task = _run(repo.create_task(team.id, "Auto complete test"))
+
+    mgr = PipelineManager(repo)
+    _run(mgr.create_pipeline(task.id, "spike"))  # 2 stages: research → report
+
+    # Advance through both stages
+    _run(mgr.advance_stage(task.id, "research done"))
+    result = _run(mgr.advance_stage(task.id, "report done"))
+
+    assert result["success"] is True
+    assert result["data"]["pipeline_completed"] is True
+    assert result["data"].get("parent_task_completed") is True
+
+    # Verify parent task status in DB
+    updated = _run(repo.get_task(task.id))
+    assert updated.status.value == "completed"
+
+
+def test_task_wall_excludes_subtasks(repo_and_loop):
+    """Task wall should not include tasks with a parent_id (pipeline subtasks)."""
+    from aiteam.loop.engine import LoopEngine
+
+    repo = repo_and_loop
+    team = _run(repo.create_team("wall-team", "coordinate"))
+    task = _run(repo.create_task(team.id, "Parent Task"))
+
+    # Create pipeline — this generates subtasks with parent_id set
+    mgr = PipelineManager(repo)
+    _run(mgr.create_pipeline(task.id, "spike"))
+
+    # Query task wall via LoopEngine directly
+    engine = LoopEngine(repo)
+    wall_data = _run(engine.get_task_wall(team.id))
+
+    # Collect all task IDs from the wall
+    all_wall_ids = []
+    for bucket in wall_data["wall"].values():
+        all_wall_ids.extend(item["id"] for item in bucket)
+    all_wall_ids.extend(item["id"] for item in wall_data.get("completed", []))
+
+    # The parent task should be on the wall
+    assert task.id in all_wall_ids
+
+    # No subtask (which has parent_id set) should appear on the wall
+    pipeline_status = _run(mgr.get_pipeline_status(task.id))
+    subtask_ids = {s["subtask_id"] for s in pipeline_status["data"]["stages"] if s["subtask_id"]}
+    for sub_id in subtask_ids:
+        assert sub_id not in all_wall_ids, f"Subtask {sub_id} should not appear on task wall"
+
+
+def test_task_wall_shows_pipeline_progress(repo_and_loop):
+    """Tasks with a pipeline should include pipeline_progress fields on the wall."""
+    from aiteam.loop.engine import LoopEngine
+
+    repo = repo_and_loop
+    team = _run(repo.create_team("progress-team", "coordinate"))
+    task = _run(repo.create_task(team.id, "Progress Task"))
+
+    # Create spike pipeline (2 stages) and advance one stage
+    mgr = PipelineManager(repo)
+    _run(mgr.create_pipeline(task.id, "spike"))
+    _run(mgr.advance_stage(task.id, "research done"))
+
+    # Query task wall via LoopEngine
+    engine = LoopEngine(repo)
+    wall_data = _run(engine.get_task_wall(team.id))
+
+    # Find the parent task in the wall (it's still in-progress after 1/2 stages)
+    parent_item = None
+    for bucket in wall_data["wall"].values():
+        for item in bucket:
+            if item["id"] == task.id:
+                parent_item = item
+    assert parent_item is not None, "Parent task not found on wall"
+    assert parent_item["pipeline_progress"] == "1/2"
+    assert parent_item["pipeline_current_stage"] == "report"
+    assert parent_item["pipeline_pct"] == 50

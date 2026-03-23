@@ -302,20 +302,32 @@ class PipelineManager:
             next_idx += 1
 
         if next_idx >= len(stages):
-            # Pipeline complete — all stages done
+            # Pipeline complete — all stages done or skipped
             pipeline["current_stage_index"] = len(stages)
             config = dict(task.config)
             config["pipeline"] = pipeline
             await self._repo.update_task(task_id, config=config)
-            logger.info("Pipeline completed: task=%s", task_id)
+
+            # Auto-mark the parent task as completed when all stages are done/skipped.
+            try:
+                await self._repo.update_task(
+                    task_id,
+                    status=TaskStatus.COMPLETED.value,
+                    completed_at=datetime.now(),
+                )
+                logger.info("Pipeline completed, parent task auto-marked completed: task=%s", task_id)
+            except Exception:
+                logger.warning("Failed to auto-complete parent task %s", task_id)
+
             return {
                 "success": True,
                 "data": {
                     "task_id": task_id,
                     "pipeline_completed": True,
+                    "parent_task_completed": True,
                     "stages_summary": self._stages_summary(stages),
                 },
-                "message": "Pipeline 所有阶段已完成！建议将父任务标记为 completed。",
+                "message": "Pipeline 所有阶段已完成！父任务已自动标记为 completed。",
             }
 
         # Advance to next stage
