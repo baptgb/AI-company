@@ -386,7 +386,7 @@ class LoopEngine:
         for task in all_tasks:
             # Filter out pipeline subtasks — they have a parent_id and should not
             # appear as top-level cards on the task wall.
-            if task.parent_id is not None:
+            if task.parent_id:
                 continue
 
             if task.status == TaskStatus.COMPLETED:

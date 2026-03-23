@@ -64,7 +64,7 @@ async def get_project_task_wall(
 
     for task in all_project_tasks:
         # Filter out pipeline subtasks — they should not appear as top-level wall cards.
-        if task.parent_id is not None:
+        if task.parent_id:
             continue
 
         s = task.status if isinstance(task.status, str) else task.status.value
