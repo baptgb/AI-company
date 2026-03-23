@@ -86,9 +86,21 @@ if __name__ == "__main__":
     _activate_venv(plugin_data)
 
     try:
-        # Start API server before MCP (BUG-3 fix)
         from aiteam.mcp.server import mcp, _ensure_api_running
-        _ensure_api_running()
+
+        # Patch sys.executable to venv python so API subprocess uses venv too
+        if plugin_data and (plugin_data / "venv").exists():
+            if sys.platform == "win32":
+                venv_py = plugin_data / "venv" / "Scripts" / "python.exe"
+            else:
+                venv_py = plugin_data / "venv" / "bin" / "python"
+            if venv_py.exists():
+                sys.executable = str(venv_py)
+
+        # Start API in background thread — must not block MCP initialization
+        # CC kills MCP server if it doesn't respond to initialize within seconds
+        import threading
+        threading.Thread(target=_ensure_api_running, daemon=True).start()
         mcp.run()
     except ImportError as e:
         print(f"[AI Team OS] ERROR: {e}", file=sys.stderr)
