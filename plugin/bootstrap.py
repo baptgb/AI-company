@@ -1,24 +1,52 @@
 #!/usr/bin/env python3
-"""MCP server bootstrap — activate venv and start server in-process.
+"""MCP server bootstrap for CC plugin installation.
 
-Instead of os.execv (breaks stdio on Windows), we modify sys.path
-to include the venv's site-packages, then import and run directly.
-This preserves stdin/stdout for MCP protocol communication.
+Resolves venv path from multiple sources (args > env > file-based discovery),
+injects venv site-packages into sys.path, starts API server, then runs MCP.
+
+CC plugin .mcp.json env vars have known bugs (not passed to subprocess),
+so paths are passed via command-line args instead.
 """
 
+import argparse
 import os
-import site
 import sys
 from pathlib import Path
 
 
-def _activate_venv():
-    """Activate venv by injecting its site-packages into sys.path."""
-    plugin_data = os.environ.get("CLAUDE_PLUGIN_DATA", "")
+def _find_plugin_data() -> Path | None:
+    """Find plugin data dir from args, env, or filesystem discovery."""
+    # Source 1: command-line args (most reliable, passed via .mcp.json args)
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--plugin-data", default="")
+    parser.add_argument("--plugin-root", default="")
+    args, _ = parser.parse_known_args()
+
+    if args.plugin_data and Path(args.plugin_data).exists():
+        return Path(args.plugin_data)
+
+    # Source 2: environment variable (works in hooks, may not work in .mcp.json)
+    env_data = os.environ.get("CLAUDE_PLUGIN_DATA", "")
+    if env_data and Path(env_data).exists():
+        return Path(env_data)
+
+    # Source 3: filesystem discovery (hardcoded fallback)
+    # CC stores plugin data at ~/.claude/plugins/data/{marketplace-name}-{plugin-name}/
+    claude_dir = Path.home() / ".claude" / "plugins" / "data"
+    if claude_dir.exists():
+        for d in claude_dir.iterdir():
+            if "ai-team-os" in d.name and (d / "venv").exists():
+                return d
+
+    return None
+
+
+def _activate_venv(plugin_data: Path | None):
+    """Inject venv site-packages into sys.path."""
     if not plugin_data:
         return
 
-    venv_dir = Path(plugin_data) / "venv"
+    venv_dir = plugin_data / "venv"
     if not venv_dir.exists():
         return
 
@@ -26,7 +54,6 @@ def _activate_venv():
     if sys.platform == "win32":
         site_packages = venv_dir / "Lib" / "site-packages"
     else:
-        # Find python version dir (e.g. python3.12)
         lib_dir = venv_dir / "lib"
         if lib_dir.exists():
             for d in lib_dir.iterdir():
@@ -39,26 +66,31 @@ def _activate_venv():
             return
 
     if site_packages.exists():
-        # Insert at front so venv packages take priority
         site_str = str(site_packages)
         if site_str not in sys.path:
             sys.path.insert(0, site_str)
-        # Also add the plugin parent (project root) for editable installs
-        plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
-        if plugin_root:
-            project_root = str(Path(plugin_root).parent)
-            src_dir = str(Path(project_root) / "src")
-            if src_dir not in sys.path:
-                sys.path.insert(0, src_dir)
+
+    # Also try adding project src dir for editable installs
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
+    if not plugin_root:
+        # Infer from __file__
+        plugin_root = str(Path(__file__).resolve().parent)
+    project_root = str(Path(plugin_root).parent)
+    src_dir = os.path.join(project_root, "src")
+    if os.path.isdir(src_dir) and src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
 
 
 if __name__ == "__main__":
-    _activate_venv()
+    plugin_data = _find_plugin_data()
+    _activate_venv(plugin_data)
 
     try:
-        from aiteam.mcp.server import mcp
+        # Start API server before MCP (BUG-3 fix)
+        from aiteam.mcp.server import mcp, _ensure_api_running
+        _ensure_api_running()
         mcp.run()
     except ImportError as e:
         print(f"[AI Team OS] ERROR: {e}", file=sys.stderr)
-        print("[AI Team OS] Run 'claude plugin update ai-team-os' and restart CC.", file=sys.stderr)
+        print("[AI Team OS] Try: claude plugin update ai-team-os", file=sys.stderr)
         sys.exit(1)
