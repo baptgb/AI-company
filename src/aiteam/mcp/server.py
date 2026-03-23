@@ -1559,17 +1559,126 @@ def _cleanup_api() -> None:
         _api_process = None
 
 
+def _get_running_api_version(timeout: float = 2.0) -> str | None:
+    """Query /api/health and return the reported version string, or None on failure.
+
+    Returns None if the port is not open, the request times out, or the
+    response does not contain a parseable version field.
+    """
+    try:
+        with urllib.request.urlopen(f"{API_URL}/api/health", timeout=timeout) as resp:
+            data = json.loads(resp.read())
+            return data.get("version")
+    except Exception:
+        return None
+
+
+def _kill_port_occupant(port: int = 8000) -> None:
+    """Kill whichever process is listening on *port*.
+
+    Uses platform-appropriate tools:
+    - Windows: ``netstat`` + ``taskkill``
+    - Unix/macOS: ``fuser`` or ``lsof`` + ``kill -9``
+    """
+    pid: int | None = None
+    if sys.platform == "win32":
+        try:
+            out = subprocess.check_output(
+                ["netstat", "-ano", "-p", "TCP"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            for line in out.splitlines():
+                if f":{port} " in line and "LISTENING" in line:
+                    pid = int(line.split()[-1])
+                    break
+            if pid:
+                subprocess.call(
+                    ["taskkill", "/F", "/PID", str(pid)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                logger.info("Killed stale API process PID=%s (Windows)", pid)
+        except Exception as exc:
+            logger.warning("Failed to kill stale process on Windows: %s", exc)
+    else:
+        # Try fuser first (Linux); fall back to lsof (macOS)
+        try:
+            out = subprocess.check_output(
+                ["fuser", f"{port}/tcp"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+            for token in out.split():
+                try:
+                    pid = int(token)
+                    break
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+        if pid is None:
+            try:
+                out = subprocess.check_output(
+                    ["lsof", "-ti", f"tcp:{port}"],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                ).strip()
+                pid = int(out.splitlines()[0]) if out else None
+            except Exception:
+                pass
+        if pid:
+            try:
+                os.kill(pid, 9)
+                logger.info("Killed stale API process PID=%s (Unix)", pid)
+            except Exception as exc:
+                logger.warning("Failed to kill stale process PID=%s: %s", pid, exc)
+        else:
+            logger.warning("Could not determine PID for port %s — unable to kill stale process", port)
+
+
 def _ensure_api_running() -> None:
     """Auto-start the FastAPI subprocess if it is not already running.
 
     MCP Server communicates in stdio mode, so the subprocess's stdout must be
     redirected to DEVNULL to avoid polluting the MCP protocol channel.
+
+    After detecting an open port, the function checks the version reported by
+    /api/health against the current package version.  If they differ — or if
+    the health endpoint does not respond (zombie process) — the occupying
+    process is killed before a fresh subprocess is launched.
     """
+    import aiteam as _aiteam_pkg
+
+    current_version = _aiteam_pkg.__version__
     global _api_process
+
     if _is_port_open():
-        logger.info("FastAPI already running on port 8000, skipping auto-start")
-        return
-    logger.info("Starting FastAPI subprocess on port 8000...")
+        running_version = _get_running_api_version()
+        if running_version is None:
+            # Port open but health endpoint unresponsive — likely a zombie.
+            logger.warning(
+                "Port 8000 occupied but /api/health timed out — killing stale process"
+            )
+            _kill_port_occupant()
+            # Wait briefly for the port to be released
+            time.sleep(1)
+        elif running_version == current_version:
+            logger.info(
+                "FastAPI already running on port 8000 (version=%s), skipping auto-start",
+                running_version,
+            )
+            return
+        else:
+            logger.info(
+                "Stale API detected (running=%s, current=%s) — restarting",
+                running_version,
+                current_version,
+            )
+            _kill_port_occupant()
+            time.sleep(1)
+
+    logger.info("Starting FastAPI subprocess on port 8000 (version=%s)...", current_version)
     try:
         _api_process = subprocess.Popen(
             [

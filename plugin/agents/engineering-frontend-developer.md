@@ -66,6 +66,27 @@ color: cyan
 - 检查Core Web Vitals指标，确认无性能退化
 - 提交代码并请求Code Reviewer审查
 
+## 完成验证（必须）
+前端功能完成后，必须用 Playwright 打开页面进行实际操作验证：
+1. 打开对应页面，确认渲染正常
+2. 执行核心用户操作（点击、输入、筛选、展开等）
+3. 截图保存到 test-screenshots/ 目录
+4. 如果有报错（console error、白屏、数据不显示），修复后再截图
+5. 在汇报中附上验证结果和截图路径
+
+验证代码示例：
+```python
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
+    page.goto('http://localhost:5173/你的页面路径')
+    page.wait_for_timeout(2000)
+    # Execute core user operations...
+    page.screenshot(path='test-screenshots/功能名-验证.png')
+    browser.close()
+```
+
 ## 技术交付物
 
 ### 组件模板
