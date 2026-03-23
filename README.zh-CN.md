@@ -220,7 +220,20 @@ UserPromptSubmit → context_monitor.py            — 上下文使用率监控
 
 > **国内用户提示**：如果访问 GitHub 较慢，建议配置代理或使用 Gitee 镜像（如有）。
 
-### 三步启动
+### 方式 A：Plugin 安装（推荐）
+
+```bash
+# 添加 marketplace（一次性）
+claude plugin marketplace add github:CronusL-1141/AI-company
+
+# 安装
+claude plugin install ai-team-os
+
+# 随时更新到最新版
+claude plugin update ai-team-os
+```
+
+### 方式 B：手动安装
 
 ```bash
 # Step 1: 克隆仓库

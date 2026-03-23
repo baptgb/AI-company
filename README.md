@@ -218,7 +218,20 @@ UserPromptSubmit → context_monitor.py            — Monitor context usage rat
 - Claude Code (MCP support required)
 - Node.js >= 20 (Dashboard frontend, optional)
 
-### Three Steps to Launch
+### Option A: Plugin Install (Recommended)
+
+```bash
+# One-time setup: add marketplace
+claude plugin marketplace add github:CronusL-1141/AI-company
+
+# Install
+claude plugin install ai-team-os
+
+# Update to latest version anytime
+claude plugin update ai-team-os
+```
+
+### Option B: Manual Install
 
 ```bash
 # Step 1: Clone the repository
