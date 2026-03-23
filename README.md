@@ -258,6 +258,21 @@ curl http://localhost:8000/api/health
 # "Create a web development team with a frontend dev, backend dev, and QA engineer"
 ```
 
+### Uninstall
+
+```bash
+# Plugin install:
+claude plugin uninstall ai-team-os
+# Then manually remove residual data:
+# Windows: rmdir /s %USERPROFILE%\.claude\plugins\data\ai-team-os-ai-team-os
+# Unix:    rm -rf ~/.claude/plugins/data/ai-team-os-*
+# Restart Claude Code to stop active hooks.
+
+# Manual install:
+python scripts/uninstall.py        # full cleanup
+python scripts/uninstall.py --dry-run  # preview first
+```
+
 ### Start the Dashboard (optional)
 
 ```bash
