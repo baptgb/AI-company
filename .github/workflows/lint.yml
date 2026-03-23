@@ -42,3 +42,4 @@ jobs:
       - name: ESLint check
         working-directory: dashboard
         run: npm run lint
+

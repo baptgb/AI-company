@@ -290,3 +290,4 @@ def detect_memory_leak(target_function, iterations=1000, snapshot_interval=100):
 - 禁止 rm -rf / 或 rm -rf ~
 - 禁止硬编码密钥（使用环境变量）
 - 禁止 git add .env/credentials/.pem/.key
+

@@ -189,3 +189,4 @@ def task_list(status: Optional[str] = None, assignee: Optional[str] = None) -> d
 - 禁止 rm -rf / 或 rm -rf ~
 - 禁止硬编码密钥（使用环境变量）
 - 禁止 git add .env/credentials/.pem/.key
+

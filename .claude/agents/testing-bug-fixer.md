@@ -206,3 +206,4 @@ fix: 空标题输入导致500服务器错误 (BUG-001)
 - 禁止 rm -rf / 或 rm -rf ~
 - 禁止硬编码密钥（使用环境变量）
 - 禁止 git add .env/credentials/.pem/.key
+
