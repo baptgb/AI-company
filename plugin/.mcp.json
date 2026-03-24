@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "ai-team-os": {
-      "command": "uvx",
-      "args": ["--from", "ai-team-os", "ai-team-os-serve"],
+      "command": "python",
+      "args": ["-m", "uv", "tool", "run", "--from", "ai-team-os", "ai-team-os-serve"],
       "env": {
         "AITEAM_API_URL": "http://localhost:8000"
       }
